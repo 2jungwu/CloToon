@@ -161,10 +161,15 @@ export function ProjectList() {
               <Link href={`/workspace/${project.id}`} className="project-card" key={project.id}>
                 <strong>{project.name}</strong>
                 <span>
-                  <Badge className="mr-2" variant="outline">
+                  <Badge
+                    className={`mr-2 ${project.contentType === "comic" ? "badge-comic" : "badge-card-news"}`}
+                    variant="outline"
+                  >
                     {project.contentType === "comic" ? "인스타툰" : "카드뉴스"}
                   </Badge>
-                  <Badge variant="secondary">{project.canvasPreset}</Badge>
+                  <Badge className="badge-canvas" variant="secondary">
+                    {project.canvasPreset}
+                  </Badge>
                 </span>
                 <small>
                   {new Intl.DateTimeFormat("ko-KR", {

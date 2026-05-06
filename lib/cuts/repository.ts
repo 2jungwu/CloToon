@@ -13,6 +13,8 @@ type CutRow = {
   dialogue: string;
   image_prompt: string;
   negative_prompt: string;
+  image_data_url: string;
+  image_status: Cut["imageStatus"];
   created_at: string;
   updated_at: string;
 };
@@ -21,7 +23,7 @@ export function listCuts(projectId: string): Cut[] {
   const rows = getDatabase()
     .prepare(
       `SELECT id, project_id, position, template, scenario, caption, dialogue,
-              image_prompt, negative_prompt, created_at, updated_at
+              image_prompt, negative_prompt, image_data_url, image_status, created_at, updated_at
        FROM cuts
        WHERE project_id = ?
        ORDER BY position ASC, created_at ASC`,
@@ -35,7 +37,7 @@ export function getCut(projectId: string, cutId: string): Cut | null {
   const row = getDatabase()
     .prepare(
       `SELECT id, project_id, position, template, scenario, caption, dialogue,
-              image_prompt, negative_prompt, created_at, updated_at
+              image_prompt, negative_prompt, image_data_url, image_status, created_at, updated_at
        FROM cuts
        WHERE project_id = ? AND id = ?`,
     )
@@ -61,6 +63,8 @@ export function createCut(input: CreateCutInput): Cut {
     dialogue: input.dialogue ?? "",
     imagePrompt: input.imagePrompt ?? "",
     negativePrompt: input.negativePrompt ?? "",
+    imageDataUrl: input.imageDataUrl ?? "",
+    imageStatus: input.imageStatus ?? "empty",
     createdAt: now,
     updatedAt: now,
   };
@@ -69,8 +73,8 @@ export function createCut(input: CreateCutInput): Cut {
     .prepare(
       `INSERT INTO cuts (
         id, project_id, position, template, scenario, caption, dialogue,
-        image_prompt, negative_prompt, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        image_prompt, negative_prompt, image_data_url, image_status, created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .run(
       cut.id,
@@ -82,6 +86,8 @@ export function createCut(input: CreateCutInput): Cut {
       cut.dialogue,
       cut.imagePrompt,
       cut.negativePrompt,
+      cut.imageDataUrl,
+      cut.imageStatus,
       cut.createdAt,
       cut.updatedAt,
     );
@@ -111,6 +117,8 @@ export function updateCut(projectId: string, cutId: string, input: UpdateCutInpu
            dialogue = ?,
            image_prompt = ?,
            negative_prompt = ?,
+           image_data_url = ?,
+           image_status = ?,
            updated_at = ?
        WHERE project_id = ? AND id = ?`,
     )
@@ -121,6 +129,8 @@ export function updateCut(projectId: string, cutId: string, input: UpdateCutInpu
       next.dialogue,
       next.imagePrompt,
       next.negativePrompt,
+      next.imageDataUrl,
+      next.imageStatus,
       next.updatedAt,
       projectId,
       cutId,
@@ -144,6 +154,8 @@ export function duplicateCut(projectId: string, cutId: string): Cut | null {
     dialogue: source.dialogue,
     imagePrompt: source.imagePrompt,
     negativePrompt: source.negativePrompt,
+    imageDataUrl: source.imageDataUrl,
+    imageStatus: source.imageStatus,
   });
 }
 
@@ -211,6 +223,8 @@ function toCut(row: CutRow): Cut {
     dialogue: row.dialogue,
     imagePrompt: row.image_prompt,
     negativePrompt: row.negative_prompt,
+    imageDataUrl: row.image_data_url,
+    imageStatus: row.image_status,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };

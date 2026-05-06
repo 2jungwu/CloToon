@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+
 import { WorkspaceEditor } from "@/components/workspace/workspace-editor";
 import { listCuts } from "@/lib/cuts/repository";
 import { getProject } from "@/lib/projects/repository";

@@ -47,4 +47,20 @@ function migrate(db: Database.Database) {
     CREATE INDEX IF NOT EXISTS idx_cuts_project_position
       ON cuts(project_id, position);
   `);
+
+  addColumnIfMissing(db, "cuts", "image_data_url", "TEXT NOT NULL DEFAULT ''");
+  addColumnIfMissing(db, "cuts", "image_status", "TEXT NOT NULL DEFAULT 'empty'");
+}
+
+function addColumnIfMissing(
+  db: Database.Database,
+  tableName: string,
+  columnName: string,
+  definition: string,
+) {
+  const columns = db.prepare(`PRAGMA table_info(${tableName})`).all() as { name: string }[];
+
+  if (!columns.some((column) => column.name === columnName)) {
+    db.exec(`ALTER TABLE ${tableName} ADD COLUMN ${columnName} ${definition}`);
+  }
 }

@@ -4,9 +4,9 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 const navItems = [
-  { href: "/projects", label: "Projects" },
-  { href: "/assets", label: "Assets" },
-  { href: "/settings", label: "Settings" },
+  { href: "/projects", label: "Projects", activePrefixes: ["/projects", "/workspace"] },
+  { href: "/assets", label: "Assets", activePrefixes: ["/assets"] },
+  { href: "/settings", label: "Settings", activePrefixes: ["/settings"] },
 ];
 
 export function AppNav() {
@@ -15,7 +15,9 @@ export function AppNav() {
   return (
     <nav aria-label="Primary navigation">
       {navItems.map((item) => {
-        const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
+        const active = item.activePrefixes.some(
+          (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`),
+        );
 
         return (
           <Link

@@ -18,6 +18,8 @@ const updateCutSchema = z.object({
   dialogue: z.string().max(2000).optional(),
   imagePrompt: z.string().max(4000).optional(),
   negativePrompt: z.string().max(2000).optional(),
+  imageDataUrl: z.string().max(8_000_000).optional(),
+  imageStatus: z.enum(["empty", "mock", "uploaded", "generated", "failed"]).optional(),
 });
 
 export async function PATCH(request: Request, { params }: CutRouteProps) {
