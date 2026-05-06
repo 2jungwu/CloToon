@@ -29,7 +29,7 @@ export default async function WorkspacePage({ params }: WorkspacePageProps) {
         <p className="eyebrow">Workspace</p>
         <h1>{project.name}</h1>
         <p>
-          {project.contentType} · {project.canvasPreset}
+          {project.contentType === "comic" ? "인스타툰" : "카드뉴스"} · {project.canvasPreset}
         </p>
       </div>
       <WorkspaceEditor project={project} initialCuts={cuts} />

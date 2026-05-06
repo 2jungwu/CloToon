@@ -1,10 +1,15 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import "./styles.css";
-import { Noto_Sans } from "next/font/google";
+import { Noto_Sans_KR } from "next/font/google";
 import { cn } from "@/lib/utils";
+import { AppNav } from "@/components/app-nav";
 
-const notoSans = Noto_Sans({subsets:['latin'],variable:'--font-sans'});
+const notoSans = Noto_Sans_KR({
+  subsets: ["latin"],
+  variable: "--font-sans",
+  weight: ["400", "500", "600", "700", "800"],
+});
 
 export const metadata: Metadata = {
   title: "Local Comic Card Studio",
@@ -23,11 +28,7 @@ export default function RootLayout({
           <Link href="/projects" className="brand">
             Local Studio
           </Link>
-          <nav aria-label="Primary navigation">
-            <Link href="/projects">Projects</Link>
-            <Link href="/assets">Assets</Link>
-            <Link href="/settings">Settings</Link>
-          </nav>
+          <AppNav />
         </header>
         <main>{children}</main>
       </body>

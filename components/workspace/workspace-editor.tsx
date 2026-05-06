@@ -1,6 +1,27 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { HugeiconsIcon } from "@hugeicons/react";
+import {
+  Add01Icon,
+  ArrowDown01Icon,
+  ArrowUp01Icon,
+  Copy01Icon,
+  Delete02Icon,
+  SaveIcon,
+} from "@hugeicons/core-free-icons";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 import type { Cut, CutTemplate } from "@/lib/cuts/types";
 import type { Project } from "@/lib/projects/types";
 
@@ -151,38 +172,50 @@ export function WorkspaceEditor({ project, initialCuts }: WorkspaceEditorProps) 
   return (
     <div className="workspace-grid">
       <aside className="workspace-panel">
+        <div className="accent-strip" aria-hidden="true">
+          <span />
+          <span />
+          <span />
+          <span />
+          <span />
+          <span />
+        </div>
         <div className="panel-heading">
           <div>
             <p className="eyebrow">Scenario</p>
             <h2>시나리오 입력</h2>
           </div>
+          <Badge variant="outline">{cuts.length} cuts</Badge>
         </div>
-        <label className="field">
-          전체 시나리오
-          <textarea
+        <div className="field">
+          <Label htmlFor="story-scenario">전체 시나리오</Label>
+          <Textarea
+            id="story-scenario"
             rows={8}
             value={scenario}
             onChange={(event) => setScenario(event.target.value)}
             placeholder="전체 이야기 흐름을 입력하세요."
           />
-        </label>
-        <label className="field compact-field">
-          컷 수
-          <input
+        </div>
+        <div className="field compact-field">
+          <Label htmlFor="target-cut-count">컷 수</Label>
+          <Input
+            id="target-cut-count"
             min={1}
             max={30}
             type="number"
             value={targetCount}
             onChange={(event) => setTargetCount(Number(event.target.value))}
           />
-        </label>
+        </div>
         <div className="button-row">
-          <button type="button" className="primary-button" onClick={buildManualCuts}>
+          <Button type="button" onClick={buildManualCuts}>
             컷 수 맞추기
-          </button>
-          <button type="button" className="secondary-button" onClick={() => addCut()}>
+          </Button>
+          <Button type="button" variant="outline" onClick={() => addCut()}>
+            <HugeiconsIcon icon={Add01Icon} />
             컷 추가
-          </button>
+          </Button>
         </div>
 
         <div className="cut-list">
@@ -216,73 +249,96 @@ export function WorkspaceEditor({ project, initialCuts }: WorkspaceEditorProps) 
         {selectedCut ? (
           <>
             <div className="toolbar-row">
-              <button type="button" className="icon-button" onClick={() => moveSelectedCut(-1)}>
-                ↑
-              </button>
-              <button type="button" className="icon-button" onClick={() => moveSelectedCut(1)}>
-                ↓
-              </button>
-              <button type="button" className="secondary-button" onClick={duplicateSelectedCut}>
-                복제
-              </button>
-              <button type="button" className="danger-button" onClick={deleteSelectedCut}>
-                삭제
-              </button>
-            </div>
-            <label className="field">
-              템플릿
-              <select
-                value={selectedCut.template}
-                onChange={(event) =>
-                  updateSelectedCut({ template: event.target.value as CutTemplate })
-                }
+              <Button
+                aria-label="선택한 컷 위로 이동"
+                size="icon"
+                type="button"
+                variant="outline"
+                onClick={() => moveSelectedCut(-1)}
               >
-                <option value="comic">인스타툰</option>
-                <option value="card-news">카드뉴스</option>
-              </select>
-            </label>
-            <label className="field">
-              컷별 시나리오
-              <textarea
+                <HugeiconsIcon icon={ArrowUp01Icon} />
+              </Button>
+              <Button
+                aria-label="선택한 컷 아래로 이동"
+                size="icon"
+                type="button"
+                variant="outline"
+                onClick={() => moveSelectedCut(1)}
+              >
+                <HugeiconsIcon icon={ArrowDown01Icon} />
+              </Button>
+              <Button type="button" variant="outline" onClick={duplicateSelectedCut}>
+                <HugeiconsIcon icon={Copy01Icon} />
+                복제
+              </Button>
+              <Button type="button" variant="destructive" onClick={deleteSelectedCut}>
+                <HugeiconsIcon icon={Delete02Icon} />
+                삭제
+              </Button>
+            </div>
+            <div className="field">
+              <Label>템플릿</Label>
+              <Select
+                value={selectedCut.template}
+                onValueChange={(value) => updateSelectedCut({ template: value as CutTemplate })}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="comic">인스타툰</SelectItem>
+                  <SelectItem value="card-news">카드뉴스</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="field">
+              <Label htmlFor="cut-scenario">컷별 시나리오</Label>
+              <Textarea
+                id="cut-scenario"
                 rows={4}
                 value={selectedCut.scenario}
                 onChange={(event) => updateSelectedCut({ scenario: event.target.value })}
               />
-            </label>
-            <label className="field">
-              자막
-              <input
+            </div>
+            <div className="field">
+              <Label htmlFor="cut-caption">자막</Label>
+              <Input
+                id="cut-caption"
                 value={selectedCut.caption}
                 onChange={(event) => updateSelectedCut({ caption: event.target.value })}
               />
-            </label>
-            <label className="field">
-              대사
-              <textarea
+            </div>
+            <div className="field">
+              <Label htmlFor="cut-dialogue">대사</Label>
+              <Textarea
+                id="cut-dialogue"
                 rows={3}
                 value={selectedCut.dialogue}
                 onChange={(event) => updateSelectedCut({ dialogue: event.target.value })}
               />
-            </label>
-            <label className="field">
-              이미지 프롬프트
-              <textarea
+            </div>
+            <div className="field">
+              <Label htmlFor="cut-image-prompt">이미지 프롬프트</Label>
+              <Textarea
+                id="cut-image-prompt"
                 rows={5}
                 value={selectedCut.imagePrompt}
                 onChange={(event) => updateSelectedCut({ imagePrompt: event.target.value })}
               />
-            </label>
-            <label className="field">
-              네거티브 프롬프트
-              <textarea
+            </div>
+            <div className="field">
+              <Label htmlFor="cut-negative-prompt">네거티브 프롬프트</Label>
+              <Textarea
+                id="cut-negative-prompt"
                 rows={3}
                 value={selectedCut.negativePrompt}
                 onChange={(event) => updateSelectedCut({ negativePrompt: event.target.value })}
               />
-            </label>
-            <button type="button" className="primary-button" onClick={saveSelectedCut}>
+            </div>
+            <Button type="button" onClick={saveSelectedCut}>
+              <HugeiconsIcon icon={SaveIcon} />
               변경 내용 저장
-            </button>
+            </Button>
           </>
         ) : (
           <p className="empty-state">편집할 컷을 선택하거나 새 컷을 추가하세요.</p>
@@ -314,8 +370,8 @@ function CutPreview({
       </div>
       {cut.template === "comic" ? (
         <>
-          <div className="comic-caption">{cut.caption || "자막"}</div>
           <div className="speech-bubble">{cut.dialogue || "대사"}</div>
+          <div className="comic-caption">{cut.caption || "자막"}</div>
         </>
       ) : (
         <div className="card-copy">

@@ -2,6 +2,18 @@
 
 import Link from "next/link";
 import { FormEvent, useEffect, useState } from "react";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import type { Project } from "@/lib/projects/types";
 
 type ProjectResponse = {
@@ -84,74 +96,87 @@ export function ProjectList() {
   return (
     <div className="project-grid">
       <form className="project-form" onSubmit={handleCreate}>
+        <div className="accent-strip" aria-hidden="true">
+          <span />
+          <span />
+          <span />
+          <span />
+          <span />
+          <span />
+        </div>
+        <p className="eyebrow">Create</p>
         <h2>새 프로젝트</h2>
-        <label>
-          프로젝트 이름
-          <input
+        <div className="field">
+          <Label htmlFor="project-name">프로젝트 이름</Label>
+          <Input
+            id="project-name"
             value={name}
             onChange={(event) => setName(event.target.value)}
             placeholder="예: clo 카드뉴스 캠페인"
           />
-        </label>
-        <label>
-          콘텐츠 유형
-          <select
-            value={contentType}
-            onChange={(event) =>
-              setContentType(event.target.value as Project["contentType"])
-            }
-          >
-            <option value="comic">인스타툰</option>
-            <option value="card-news">카드뉴스</option>
-          </select>
-        </label>
-        <label>
-          캔버스
-          <select
-            value={canvasPreset}
-            onChange={(event) =>
-              setCanvasPreset(event.target.value as Project["canvasPreset"])
-            }
-          >
-            <option value="1:1">1080 x 1080</option>
-            <option value="4:5">4:5</option>
-            <option value="9:16">9:16</option>
-          </select>
-        </label>
-        <button disabled={creating || name.trim().length === 0} type="submit">
+        </div>
+        <div className="field">
+          <Label>콘텐츠 유형</Label>
+          <Select value={contentType} onValueChange={(value) => setContentType(value as Project["contentType"])}>
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="comic">인스타툰</SelectItem>
+              <SelectItem value="card-news">카드뉴스</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="field">
+          <Label>캔버스</Label>
+          <Select value={canvasPreset} onValueChange={(value) => setCanvasPreset(value as Project["canvasPreset"])}>
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="1:1">1080 x 1080</SelectItem>
+              <SelectItem value="4:5">4:5</SelectItem>
+              <SelectItem value="9:16">9:16</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <Button disabled={creating || name.trim().length === 0} type="submit">
           {creating ? "생성 중..." : "프로젝트 생성"}
-        </button>
+        </Button>
         {error ? <p className="form-error">{error}</p> : null}
       </form>
 
-      <section className="project-list" aria-label="Projects">
-        <h2>저장된 프로젝트</h2>
-        {loading ? <p>불러오는 중...</p> : null}
-        {!loading && projects.length === 0 ? (
-          <p className="empty-state">아직 저장된 프로젝트가 없습니다.</p>
-        ) : null}
-        <div className="project-cards">
-          {projects.map((project) => (
-            <Link
-              href={`/workspace/${project.id}`}
-              className="project-card"
-              key={project.id}
-            >
-              <strong>{project.name}</strong>
-              <span>
-                {project.contentType === "comic" ? "인스타툰" : "카드뉴스"} ·{" "}
-                {project.canvasPreset}
-              </span>
-              <small>
-                {new Intl.DateTimeFormat("ko-KR", {
-                  dateStyle: "medium",
-                  timeStyle: "short",
-                }).format(new Date(project.updatedAt))}
-              </small>
-            </Link>
-          ))}
-        </div>
-      </section>
+      <Card className="project-list" size="sm">
+        <CardHeader className="px-0">
+          <p className="eyebrow">Saved</p>
+          <CardTitle>저장된 프로젝트</CardTitle>
+        </CardHeader>
+        <CardContent className="px-0">
+          {loading ? <p className="empty-state">불러오는 중...</p> : null}
+          {!loading && projects.length === 0 ? (
+            <p className="empty-state">아직 저장된 프로젝트가 없습니다.</p>
+          ) : null}
+          <div className="project-cards">
+            {projects.map((project) => (
+              <Link href={`/workspace/${project.id}`} className="project-card" key={project.id}>
+                <strong>{project.name}</strong>
+                <span>
+                  <Badge className="mr-2" variant="outline">
+                    {project.contentType === "comic" ? "인스타툰" : "카드뉴스"}
+                  </Badge>
+                  <Badge variant="secondary">{project.canvasPreset}</Badge>
+                </span>
+                <small>
+                  {new Intl.DateTimeFormat("ko-KR", {
+                    dateStyle: "medium",
+                    timeStyle: "short",
+                  }).format(new Date(project.updatedAt))}
+                </small>
+              </Link>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }
