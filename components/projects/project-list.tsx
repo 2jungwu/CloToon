@@ -7,7 +7,7 @@ import { HugeiconsIcon } from "@hugeicons/react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -176,7 +176,6 @@ export function ProjectList() {
       <Card className="project-list" size="sm">
         <CardHeader className="project-list-heading px-0">
           <p className="eyebrow">Saved</p>
-          <CardTitle>저장된 프로젝트</CardTitle>
         </CardHeader>
         <CardContent className="px-0">
           {loading ? <p className="empty-state">불러오는 중...</p> : null}

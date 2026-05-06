@@ -2,10 +2,84 @@
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 
+@font-face {
+  font-family: "Pretendard";
+  font-style: normal;
+  font-weight: 100;
+  font-display: swap;
+  src: url("/fonts/pretendard/Pretendard-Thin.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Pretendard";
+  font-style: normal;
+  font-weight: 200;
+  font-display: swap;
+  src: url("/fonts/pretendard/Pretendard-ExtraLight.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Pretendard";
+  font-style: normal;
+  font-weight: 300;
+  font-display: swap;
+  src: url("/fonts/pretendard/Pretendard-Light.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Pretendard";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("/fonts/pretendard/Pretendard-Regular.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Pretendard";
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url("/fonts/pretendard/Pretendard-Medium.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Pretendard";
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("/fonts/pretendard/Pretendard-SemiBold.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Pretendard";
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("/fonts/pretendard/Pretendard-Bold.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Pretendard";
+  font-style: normal;
+  font-weight: 800;
+  font-display: swap;
+  src: url("/fonts/pretendard/Pretendard-ExtraBold.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Pretendard";
+  font-style: normal;
+  font-weight: 900;
+  font-display: swap;
+  src: url("/fonts/pretendard/Pretendard-Black.woff2") format("woff2");
+}
+
 @custom-variant dark (&:is(.dark *));
 
 :root {
   color-scheme: light;
+  --font-pretendard: "Pretendard", Arial, ui-sans-serif, system-ui, sans-serif;
+  --font-sans: var(--font-pretendard);
   --background: #ffffff;
   --foreground: #080808;
   --card: #ffffff;
@@ -71,7 +145,7 @@ body {
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: var(--font-sans), Arial, ui-sans-serif, system-ui, sans-serif;
+  font-family: var(--font-sans);
   letter-spacing: 0;
 }
 
@@ -104,13 +178,13 @@ textarea {
 [data-slot="button"] {
   font-weight: 600;
   transition:
-    transform 160ms ease,
     background-color 160ms ease,
     border-color 160ms ease;
 }
 
-[data-slot="button"]:hover:not(:disabled) {
-  transform: translateX(6px);
+[data-slot="button"][data-size="default"] {
+  height: 48px;
+  padding-inline: 16px;
 }
 
 .app-header {
@@ -165,7 +239,6 @@ textarea {
   transition:
     border-color 160ms ease,
     color 160ms ease,
-    transform 160ms ease,
     background-color 160ms ease;
   text-transform: uppercase;
 }
@@ -175,7 +248,6 @@ textarea {
   border-color: var(--wf-border);
   color: var(--wf-blue);
   outline: 0;
-  transform: translateX(6px);
 }
 
 .app-header nav a[data-active="true"] {
@@ -277,7 +349,7 @@ textarea {
   color: var(--wf-gray-800);
   display: grid;
   gap: 8px;
-  font-size: 12px;
+  font-size: 14px;
   font-weight: 700;
   letter-spacing: 0.9px;
   text-transform: uppercase;
@@ -314,6 +386,12 @@ textarea {
   outline: 3px solid rgba(20, 110, 245, 0.18);
 }
 
+input::placeholder,
+textarea::placeholder {
+  color: var(--wf-gray-300);
+  opacity: 1;
+}
+
 .project-list {
   padding: 24px;
 }
@@ -341,7 +419,6 @@ textarea {
   text-align: left;
   transition:
     border-color 160ms ease,
-    transform 160ms ease,
     box-shadow 160ms ease;
 }
 
@@ -354,7 +431,6 @@ textarea {
   border-color: var(--wf-blue);
   box-shadow: var(--wf-shadow);
   outline: 0;
-  transform: translateX(6px);
 }
 
 .project-card {
@@ -474,7 +550,7 @@ textarea {
   color: var(--wf-gray-800);
   display: grid;
   gap: 8px;
-  font-size: 12px;
+  font-size: 14px;
   font-weight: 700;
   letter-spacing: 0.9px;
   text-transform: uppercase;
@@ -552,15 +628,12 @@ textarea {
   font-weight: 600;
   min-height: 36px;
   padding: 8px 12px;
-  transition:
-    transform 160ms ease,
-    border-color 160ms ease;
+  transition: border-color 160ms ease;
 }
 
 .upload-button:hover,
 .upload-button:focus-within {
   border-color: var(--wf-blue);
-  transform: translateX(6px);
 }
 
 .upload-button input {
@@ -960,8 +1033,8 @@ textarea {
 }
 
 @theme inline {
-  --font-heading: var(--font-sans);
-  --font-sans: var(--font-sans);
+  --font-heading: var(--font-pretendard);
+  --font-sans: var(--font-pretendard);
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
