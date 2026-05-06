@@ -69,6 +69,19 @@ export function createProject(input: CreateProjectInput): Project {
   return project;
 }
 
+export function deleteProject(id: string): boolean {
+  const db = getDatabase();
+  const deleteCuts = db.prepare(`DELETE FROM cuts WHERE project_id = ?`);
+  const deleteProjectById = db.prepare(`DELETE FROM projects WHERE id = ?`);
+
+  const changes = db.transaction(() => {
+    deleteCuts.run(id);
+    return deleteProjectById.run(id).changes;
+  })();
+
+  return changes > 0;
+}
+
 function toProject(row: ProjectRow): Project {
   return {
     id: row.id,

@@ -25,10 +25,12 @@ export default function RootLayout({
     <html lang="ko" className={cn("font-sans", notoSans.variable)}>
       <body>
         <header className="app-header">
-          <Link href="/projects" className="brand">
-            Local Studio
-          </Link>
-          <AppNav />
+          <div className="app-header-inner">
+            <Link href="/projects" className="brand">
+              Local Studio
+            </Link>
+            <AppNav />
+          </div>
         </header>
         <main>{children}</main>
       </body>
