@@ -10,7 +10,6 @@ import {
   ArrowUp01Icon,
   Copy01Icon,
   Delete02Icon,
-  SaveIcon,
 } from "@hugeicons/core-free-icons";
 
 import { Badge } from "@/components/ui/badge";
@@ -26,11 +25,33 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import type { Cut, CutImageStatus, CutTemplate } from "@/lib/cuts/types";
+import {
+  loadGeminiApiKeyFromStorage,
+  loadImageGenerationAssetsFromStorage,
+} from "@/lib/image-generation/storage";
+import type { ImageGenerationAssets } from "@/lib/image-generation/types";
 import type { Project } from "@/lib/projects/types";
 
 type WorkspaceEditorProps = {
   project: Project;
   initialCuts: Cut[];
+};
+
+type GenerationState = {
+  status: "idle" | "generating" | "done" | "error";
+  message: string;
+};
+
+type ImageGenerationSuccess = {
+  imageDataUrl: string;
+  mimeType: string;
+  model: string;
+};
+
+type ImageGenerationFailure = {
+  error: string;
+  status?: string;
+  message?: string;
 };
 
 const templateLabels: Record<CutTemplate, string> = {
@@ -52,6 +73,10 @@ export function WorkspaceEditor({ project, initialCuts }: WorkspaceEditorProps) 
   const [targetCount, setTargetCount] = useState(String(Math.max(initialCuts.length, 4)));
   const [scenario, setScenario] = useState("");
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  const [generationState, setGenerationState] = useState<GenerationState>({
+    status: "idle",
+    message: "",
+  });
   const [exportState, setExportState] = useState<"idle" | "exporting" | "done" | "error">("idle");
   const exportRootRef = useRef<HTMLDivElement | null>(null);
 
@@ -175,27 +200,10 @@ export function WorkspaceEditor({ project, initialCuts }: WorkspaceEditorProps) 
       return;
     }
 
+    setGenerationState({ status: "idle", message: "" });
     setCuts((current) =>
       current.map((cut) => (cut.id === selectedCut.id ? { ...cut, [field]: value } : cut)),
     );
-  }
-
-  async function saveSelectedCut() {
-    if (!selectedCut) {
-      return;
-    }
-
-    await persistCutPatch(selectedCut, {
-      template: selectedCut.template,
-      position: selectedCut.position,
-      scenario: selectedCut.scenario,
-      caption: selectedCut.caption,
-      dialogue: selectedCut.dialogue,
-      imagePrompt: selectedCut.imagePrompt,
-      negativePrompt: selectedCut.negativePrompt,
-      imageDataUrl: selectedCut.imageDataUrl,
-      imageStatus: selectedCut.imageStatus,
-    });
   }
 
   async function buildManualCuts() {
@@ -243,10 +251,95 @@ export function WorkspaceEditor({ project, initialCuts }: WorkspaceEditorProps) 
     }
 
     const dataUrl = await readFileAsDataUrl(file);
+    setGenerationState({ status: "idle", message: "" });
     await persistCutPatch(selectedCut, {
       imageDataUrl: dataUrl,
       imageStatus: "uploaded",
     });
+  }
+
+  async function generateSelectedCutImage() {
+    if (!selectedCut) {
+      return;
+    }
+
+    const apiKey = loadGeminiApiKeyFromStorage(window.localStorage);
+
+    if (!apiKey) {
+      setGenerationState({
+        status: "error",
+        message: "Assets > API Key에서 Gemini API Key를 먼저 저장해주세요.",
+      });
+      return;
+    }
+
+    let savedCut: Cut | null = null;
+    setGenerationState({ status: "generating", message: "컷 저장 후 이미지 생성 중..." });
+
+    try {
+      const assets = limitExpressionReferences(loadImageGenerationAssetsFromStorage(window.localStorage));
+      savedCut = await persistCutPatch(selectedCut, {
+        template: selectedCut.template,
+        position: selectedCut.position,
+        scenario: selectedCut.scenario,
+        caption: selectedCut.caption,
+        dialogue: selectedCut.dialogue,
+        imagePrompt: selectedCut.imagePrompt,
+        negativePrompt: selectedCut.negativePrompt,
+        imageDataUrl: selectedCut.imageDataUrl,
+        imageStatus: selectedCut.imageStatus,
+      });
+
+      const response = await fetch("/api/images/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          apiKey,
+          project: {
+            id: project.id,
+            name: project.name,
+            contentType: project.contentType,
+            canvasPreset: project.canvasPreset,
+          },
+          cut: {
+            id: savedCut.id,
+            position: savedCut.position,
+            template: savedCut.template,
+            scenario: savedCut.scenario,
+            caption: savedCut.caption,
+            dialogue: savedCut.dialogue,
+            imagePrompt: savedCut.imagePrompt,
+            negativePrompt: savedCut.negativePrompt,
+          },
+          assets,
+        }),
+      });
+      const payload = (await response.json().catch(() => null)) as
+        | ImageGenerationSuccess
+        | ImageGenerationFailure
+        | null;
+
+      if (!response.ok || !payload || !("imageDataUrl" in payload)) {
+        throw new Error(
+          getImageGenerationErrorMessage(response.status, payload && "error" in payload ? payload : null),
+        );
+      }
+
+      await persistCutPatch(savedCut, {
+        imageDataUrl: payload.imageDataUrl,
+        imageStatus: "generated",
+      });
+      setGenerationState({ status: "done", message: "이미지 생성 완료" });
+    } catch (error) {
+      if (savedCut) {
+        await persistCutPatch(savedCut, { imageStatus: "failed" }).catch(() => undefined);
+      }
+
+      setGenerationState({
+        status: "error",
+        message: error instanceof Error ? error.message : "이미지 생성에 실패했습니다.",
+      });
+    }
   }
 
   async function downloadCurrentCut() {
@@ -442,9 +535,12 @@ export function WorkspaceEditor({ project, initialCuts }: WorkspaceEditorProps) 
               </Label>
 
               <div className="toolbar-row">
-                <Button type="button" onClick={saveSelectedCut}>
-                  <HugeiconsIcon icon={SaveIcon} size={18} aria-hidden />
-                  저장
+                <Button
+                  type="button"
+                  onClick={generateSelectedCutImage}
+                  disabled={generationState.status === "generating"}
+                >
+                  {generationState.status === "generating" ? "이미지 생성 중..." : "이미지 생성"}
                 </Button>
                 <Button type="button" variant="secondary" onClick={applyMockImage}>
                   Mock 이미지
@@ -478,10 +574,12 @@ export function WorkspaceEditor({ project, initialCuts }: WorkspaceEditorProps) 
                 </Button>
               </div>
 
-              <p className={`save-state save-state-${saveState}`}>
-                {saveState === "saving" && "저장 중..."}
-                {saveState === "saved" && "저장 완료"}
-                {saveState === "error" && "저장 실패"}
+              <p className={`save-state save-state-${getStatusMessageClass(saveState, generationState.status)}`}>
+                {generationState.message ||
+                  (saveState === "saving" && "저장 중...") ||
+                  (saveState === "saved" && "저장 완료") ||
+                  (saveState === "error" && "저장 실패") ||
+                  ""}
               </p>
             </>
           ) : (
@@ -582,6 +680,58 @@ function splitScenario(text: string, count: number) {
   }
 
   return Array.from({ length: count }, (_, index) => sentences[index % sentences.length] ?? trimmed);
+}
+
+function limitExpressionReferences(assets: ImageGenerationAssets): ImageGenerationAssets {
+  return {
+    ...assets,
+    characters: assets.characters.map((character) => ({
+      ...character,
+      expressions:
+        character.id === assets.selectedCharacterId ? character.expressions.slice(0, 3) : [],
+    })),
+  };
+}
+
+function getImageGenerationErrorMessage(status: number, payload: ImageGenerationFailure | null) {
+  const detail = [payload?.status, payload?.message, payload?.error].filter(Boolean).join(" ");
+
+  if (status === 401 || status === 403) {
+    return "Gemini API Key를 확인해주세요.";
+  }
+
+  if (status === 429 || /RESOURCE_EXHAUSTED|quota/i.test(detail)) {
+    return "Gemini 이미지 생성 할당량이 부족합니다. Google AI Studio의 billing/quota를 확인해주세요.";
+  }
+
+  if (status === 400) {
+    return payload?.message || "이미지 생성 요청을 만들지 못했습니다.";
+  }
+
+  if (status >= 500) {
+    return "Gemini 서비스 응답이 불안정합니다. 잠시 후 다시 시도해주세요.";
+  }
+
+  return payload?.message || "이미지 생성에 실패했습니다.";
+}
+
+function getStatusMessageClass(
+  saveState: "idle" | "saving" | "saved" | "error",
+  generationStatus: GenerationState["status"],
+) {
+  if (generationStatus === "generating") {
+    return "saving";
+  }
+
+  if (generationStatus === "done") {
+    return "saved";
+  }
+
+  if (generationStatus === "error") {
+    return "error";
+  }
+
+  return saveState;
 }
 
 function createMockImageDataUrl(cut: Cut, project: Project) {

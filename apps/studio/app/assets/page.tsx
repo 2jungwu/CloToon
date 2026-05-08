@@ -1,7 +1,12 @@
 "use client";
 
 import Image from "next/image";
-import { useState } from "react";
+import { useMemo, useState, useSyncExternalStore } from "react";
+import {
+  Add01Icon,
+  Delete02Icon,
+} from "@hugeicons/core-free-icons";
+import { HugeiconsIcon } from "@hugeicons/react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,56 +20,172 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 
+type AssetSection = "characters" | "background" | "fonts" | "api-key" | "export";
+
 type ExpressionImage = {
   id: string;
   name: string;
   dataUrl: string;
 };
 
-type StudioAssets = {
-  characterName: string;
-  characterMarkdown: string;
+type CharacterAsset = {
+  id: string;
+  name: string;
+  markdown: string;
   expressions: ExpressionImage[];
-  backgroundName: string;
-  backgroundPrompt: string;
-  backgroundColor: string;
-  subtitleFont: string;
-  dialogueFont: string;
 };
 
-const storageKey = "local-studio-assets";
-
-const defaultAssets: StudioAssets = {
-  characterName: "clo",
-  characterMarkdown:
-    "# clo\n\n- 둥근 실루엣과 선명한 눈매를 가진 일관 캐릭터\n- 따뜻하지만 과장되지 않은 표정\n- 인스타툰에 맞는 깨끗한 선과 밝은 색감",
-  expressions: [],
-  backgroundName: "studio-room",
-  backgroundPrompt: "clean local studio room, soft daylight, editorial webtoon background, no text",
-  backgroundColor: "#f7f7f7",
-  subtitleFont: "Pretendard",
-  dialogueFont: "Pretendard",
+type StudioAssets = {
+  version: 2;
+  characters: CharacterAsset[];
+  selectedCharacterId: string;
+  background: {
+    name: string;
+    prompt: string;
+    color: string;
+  };
+  fonts: {
+    subtitle: string;
+    dialogue: string;
+  };
 };
+
+type StudioSettings = {
+  provider: "gemini";
+  geminiApiKey: string;
+  exportScale: "1080" | "2160";
+  saveOriginalHtml: boolean;
+};
+
+const assetsStorageKey = "local-studio-assets";
+const settingsStorageKey = "local-studio-settings";
+
+const menuItems: { id: AssetSection; label: string }[] = [
+  { id: "characters", label: "캐릭터" },
+  { id: "background", label: "배경" },
+  { id: "fonts", label: "폰트" },
+  { id: "api-key", label: "API Key" },
+  { id: "export", label: "내보내기" },
+];
+
+const defaultMarkdown = `# clo
+
+- 로컬 제작 흐름에 사용하는 기본 캐릭터
+- 밝고 선명한 인스타툰 톤
+- 과장되지 않은 표정과 깨끗한 실루엣`;
 
 export default function AssetsPage() {
-  const [assets, setAssets] = useState(loadAssets);
-  const [saveState, setSaveState] = useState<"idle" | "saved">("idle");
+  const hydrated = useHydrated();
 
-  function updateAssets(patch: Partial<StudioAssets>) {
-    setAssets((current) => ({ ...current, ...patch }));
+  if (!hydrated) {
+    return <AssetsLoading />;
+  }
+
+  return (
+    <AssetsClient
+      initialAssets={loadAssets()}
+      initialSection={loadInitialSection()}
+      initialSettings={loadSettings()}
+    />
+  );
+}
+
+function AssetsClient({
+  initialAssets,
+  initialSection,
+  initialSettings,
+}: {
+  initialAssets: StudioAssets;
+  initialSection: AssetSection;
+  initialSettings: StudioSettings;
+}) {
+  const [assets, setAssets] = useState(initialAssets);
+  const [settings, setSettings] = useState(initialSettings);
+  const [activeSection, setActiveSection] = useState<AssetSection>(initialSection);
+  const [saveState, setSaveState] = useState<"idle" | "assets" | "settings">("idle");
+
+  const selectedCharacter = useMemo(
+    () =>
+      assets.characters.find((character) => character.id === assets.selectedCharacterId) ??
+      assets.characters[0],
+    [assets.characters, assets.selectedCharacterId],
+  );
+
+  function changeSection(section: AssetSection) {
+    setActiveSection(section);
+    window.history.replaceState(null, "", section === "characters" ? "/assets" : `/assets?section=${section}`);
+  }
+
+  function updateAssets(updater: (current: StudioAssets) => StudioAssets) {
+    setAssets((current) => ensureAssets(updater(current)));
+    setSaveState("idle");
+  }
+
+  function updateSettings(patch: Partial<StudioSettings>) {
+    setSettings((current) => ({ ...current, ...patch, provider: "gemini" }));
     setSaveState("idle");
   }
 
   function saveAssets() {
-    window.localStorage.setItem(storageKey, JSON.stringify(assets));
-    setSaveState("saved");
+    window.localStorage.setItem(assetsStorageKey, JSON.stringify(assets));
+    setSaveState("assets");
+  }
+
+  function saveSettings() {
+    window.localStorage.setItem(settingsStorageKey, JSON.stringify({ ...settings, provider: "gemini" }));
+    setSaveState("settings");
+  }
+
+  function addCharacter() {
+    const nextNumber = assets.characters.length + 1;
+    const character = createCharacter(`새 캐릭터 ${nextNumber}`);
+    updateAssets((current) => ({
+      ...current,
+      characters: [...current.characters, character],
+      selectedCharacterId: character.id,
+    }));
+  }
+
+  function deleteSelectedCharacter() {
+    if (assets.characters.length <= 1) {
+      return;
+    }
+
+    const confirmed = window.confirm(`"${selectedCharacter.name}" 캐릭터를 삭제할까요?`);
+
+    if (!confirmed) {
+      return;
+    }
+
+    updateAssets((current) => {
+      const characters = current.characters.filter((character) => character.id !== selectedCharacter.id);
+      return {
+        ...current,
+        characters,
+        selectedCharacterId: characters[0]?.id ?? current.selectedCharacterId,
+      };
+    });
+  }
+
+  function selectCharacter(characterId: string) {
+    updateAssets((current) => ({ ...current, selectedCharacterId: characterId }));
+  }
+
+  function updateSelectedCharacter(patch: Partial<CharacterAsset>) {
+    updateAssets((current) => ({
+      ...current,
+      characters: current.characters.map((character) =>
+        character.id === selectedCharacter.id ? { ...character, ...patch } : character,
+      ),
+    }));
   }
 
   async function importMarkdown(file: File | null) {
     if (!file) {
       return;
     }
-    updateAssets({ characterMarkdown: await file.text() });
+
+    updateSelectedCharacter({ markdown: await file.text() });
   }
 
   async function importExpressions(files: FileList | null) {
@@ -74,132 +195,484 @@ export default function AssetsPage() {
 
     const images = await Promise.all(
       Array.from(files).map(async (file) => ({
-        id: crypto.randomUUID(),
+        id: createId("expression"),
         name: file.name,
         dataUrl: await readFileAsDataUrl(file),
       })),
     );
 
-    updateAssets({ expressions: [...assets.expressions, ...images] });
+    updateSelectedCharacter({ expressions: [...selectedCharacter.expressions, ...images] });
+  }
+
+  function deleteExpression(expressionId: string) {
+    updateSelectedCharacter({
+      expressions: selectedCharacter.expressions.filter((image) => image.id !== expressionId),
+    });
   }
 
   return (
     <section className="page-shell">
       <div className="page-heading">
         <p className="eyebrow">Assets</p>
-        <h1>자산 설정</h1>
-        <p>캐릭터 설명 Markdown, 표정 이미지, 배경 프롬프트, 자막/대사 폰트를 로컬에 저장합니다.</p>
+        <h1>에셋 설정</h1>
+        <p>캐릭터, 배경, 폰트, API Key, 내보내기 옵션을 로컬에 저장합니다.</p>
       </div>
 
-      <div className="asset-grid">
-        <div className="editor-panel">
-          <div className="panel-heading">
-            <div>
-              <p className="eyebrow">Character</p>
-              <h2>캐릭터 프로필</h2>
-            </div>
-          </div>
-          <Label className="field-stack">
-            캐릭터 이름
-            <Input
-              value={assets.characterName}
-              onChange={(event) => updateAssets({ characterName: event.target.value })}
-            />
-          </Label>
-          <Label className="field-stack">
-            캐릭터 Markdown
-            <Textarea
-              value={assets.characterMarkdown}
-              rows={10}
-              onChange={(event) => updateAssets({ characterMarkdown: event.target.value })}
-            />
-          </Label>
-          <Label className="upload-button">
-            Markdown 파일 업로드
-            <input type="file" accept=".md,text/markdown,text/plain" onChange={(event) => importMarkdown(event.target.files?.[0] ?? null)} />
-          </Label>
-        </div>
-
-        <div className="editor-panel">
-          <div className="panel-heading">
-            <div>
-              <p className="eyebrow">Expressions</p>
-              <h2>표정 이미지</h2>
-            </div>
-          </div>
-          <Label className="upload-button">
-            표정 이미지 추가
-            <input
-              type="file"
-              multiple
-              accept="image/png,image/jpeg,image/webp"
-              onChange={(event) => importExpressions(event.target.files)}
-            />
-          </Label>
-          <div className="expression-grid">
-            {assets.expressions.map((image) => (
-              <figure key={image.id} className="expression-card">
-                <Image src={image.dataUrl} alt={image.name} width={160} height={160} unoptimized />
-                <figcaption>{image.name}</figcaption>
-              </figure>
+      <div className="split-layout asset-layout">
+        <aside className="split-menu" aria-label="Assets menu">
+          <div className="split-menu-list">
+            {menuItems.map((item) => (
+              <button
+                aria-current={activeSection === item.id ? "page" : undefined}
+                className="split-menu-item"
+                data-active={activeSection === item.id}
+                key={item.id}
+                onClick={() => changeSection(item.id)}
+                type="button"
+              >
+                {item.label}
+              </button>
             ))}
-            {assets.expressions.length === 0 ? <p className="empty-state">아직 등록된 표정 이미지가 없습니다.</p> : null}
           </div>
-        </div>
+        </aside>
 
-        <div className="editor-panel">
-          <div className="panel-heading">
-            <div>
-              <p className="eyebrow">Background</p>
-              <h2>배경과 폰트</h2>
-            </div>
-          </div>
-          <Label className="field-stack">
-            배경 이름
-            <Input
-              value={assets.backgroundName}
-              onChange={(event) => updateAssets({ backgroundName: event.target.value })}
+        <div className="split-content asset-detail">
+          {activeSection === "characters" ? (
+            <CharacterPanel
+              characterCount={assets.characters.length}
+              characters={assets.characters}
+              onAddCharacter={addCharacter}
+              onDeleteCharacter={deleteSelectedCharacter}
+              onDeleteExpression={deleteExpression}
+              onImportExpressions={importExpressions}
+              onImportMarkdown={importMarkdown}
+              onSave={saveAssets}
+              onSelectCharacter={selectCharacter}
+              onUpdateCharacter={updateSelectedCharacter}
+              saveState={saveState}
+              selectedCharacter={selectedCharacter}
             />
-          </Label>
-          <Label className="field-stack">
-            배경 프롬프트
-            <Textarea
-              value={assets.backgroundPrompt}
-              rows={4}
-              onChange={(event) => updateAssets({ backgroundPrompt: event.target.value })}
+          ) : null}
+
+          {activeSection === "background" ? (
+            <BackgroundPanel
+              assets={assets}
+              onSave={saveAssets}
+              onUpdate={(background) => updateAssets((current) => ({ ...current, background }))}
+              saveState={saveState}
             />
-          </Label>
-          <Label className="field-stack">
-            배경 색상
-            <Input
-              type="color"
-              value={assets.backgroundColor}
-              onChange={(event) => updateAssets({ backgroundColor: event.target.value })}
+          ) : null}
+
+          {activeSection === "fonts" ? (
+            <FontsPanel
+              assets={assets}
+              onSave={saveAssets}
+              onUpdate={(fonts) => updateAssets((current) => ({ ...current, fonts }))}
+              saveState={saveState}
             />
-          </Label>
-          <div className="form-grid compact">
-            <Label className="field-stack">
-              자막 폰트
-              <FontSelect value={assets.subtitleFont} onChange={(value) => updateAssets({ subtitleFont: value })} />
-            </Label>
-            <Label className="field-stack">
-              대사 폰트
-              <FontSelect value={assets.dialogueFont} onChange={(value) => updateAssets({ dialogueFont: value })} />
-            </Label>
-          </div>
-          <div className="asset-preview" style={{ background: assets.backgroundColor }}>
-            <strong style={{ fontFamily: assets.subtitleFont }}>{assets.characterName}</strong>
-            <span style={{ fontFamily: assets.dialogueFont }}>프롬프트에 활용될 로컬 자산 미리보기</span>
-          </div>
-          <div className="toolbar-row">
-            <Button type="button" onClick={saveAssets}>
-              로컬 저장
-            </Button>
-            <p className="save-state save-state-saved">{saveState === "saved" ? "저장 완료" : ""}</p>
-          </div>
+          ) : null}
+
+          {activeSection === "api-key" ? (
+            <ApiKeyPanel
+              onSave={saveSettings}
+              onUpdate={updateSettings}
+              saveState={saveState}
+              settings={settings}
+            />
+          ) : null}
+
+          {activeSection === "export" ? (
+            <ExportPanel
+              assets={assets}
+              onSave={saveSettings}
+              onUpdate={updateSettings}
+              saveState={saveState}
+              settings={settings}
+            />
+          ) : null}
         </div>
       </div>
     </section>
+  );
+}
+
+function AssetsLoading() {
+  return (
+    <section className="page-shell">
+      <div className="page-heading">
+        <p className="eyebrow">Assets</p>
+        <h1>에셋 설정</h1>
+        <p>로컬 에셋 설정을 불러오는 중입니다.</p>
+      </div>
+      <div className="split-layout asset-layout">
+        <aside className="split-menu" aria-label="Assets menu">
+          <p className="empty-state">메뉴를 준비하는 중입니다.</p>
+        </aside>
+        <div className="split-content asset-detail">
+          <p className="empty-state">세부 설정을 준비하는 중입니다.</p>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function CharacterPanel({
+  characterCount,
+  characters,
+  onDeleteCharacter,
+  onDeleteExpression,
+  onAddCharacter,
+  onImportExpressions,
+  onImportMarkdown,
+  onSave,
+  onSelectCharacter,
+  onUpdateCharacter,
+  saveState,
+  selectedCharacter,
+}: {
+  characterCount: number;
+  characters: CharacterAsset[];
+  onAddCharacter: () => void;
+  onDeleteCharacter: () => void;
+  onDeleteExpression: (expressionId: string) => void;
+  onImportExpressions: (files: FileList | null) => void;
+  onImportMarkdown: (file: File | null) => void;
+  onSave: () => void;
+  onSelectCharacter: (characterId: string) => void;
+  onUpdateCharacter: (patch: Partial<CharacterAsset>) => void;
+  saveState: "idle" | "assets" | "settings";
+  selectedCharacter: CharacterAsset;
+}) {
+  return (
+    <>
+      <div className="panel-heading">
+        <div>
+          <p className="eyebrow">Character</p>
+          <h2>캐릭터</h2>
+        </div>
+        <Button onClick={onAddCharacter} type="button" variant="secondary">
+          <HugeiconsIcon icon={Add01Icon} size={18} aria-hidden />
+          캐릭터 추가
+        </Button>
+      </div>
+
+      <div className="character-disclosure-list">
+        {characters.map((character) => {
+          const expanded = character.id === selectedCharacter.id;
+
+          return (
+            <section className="character-disclosure" data-open={expanded} key={character.id}>
+              <button
+                aria-expanded={expanded}
+                className="character-disclosure-trigger"
+                onClick={() => onSelectCharacter(character.id)}
+                type="button"
+              >
+                <strong>{character.name}</strong>
+                <span>캐릭터 표정 {character.expressions.length}개</span>
+              </button>
+
+              {expanded ? (
+                <div className="character-disclosure-body">
+                  <Label className="field-stack">
+                    캐릭터 이름
+                    <Input
+                      value={character.name}
+                      onChange={(event) => onUpdateCharacter({ name: event.target.value })}
+                    />
+                  </Label>
+
+                  <Label className="field-stack">
+                    캐릭터 설명(md)
+                    <Textarea
+                      value={character.markdown}
+                      rows={10}
+                      onChange={(event) => onUpdateCharacter({ markdown: event.target.value })}
+                    />
+                  </Label>
+
+                  <div className="toolbar-row">
+                    <Label className="upload-button">
+                      Markdown 업로드
+                      <input
+                        type="file"
+                        accept=".md,text/markdown,text/plain"
+                        onChange={(event) => onImportMarkdown(event.target.files?.[0] ?? null)}
+                      />
+                    </Label>
+                    <Label className="upload-button">
+                      캐릭터 표정 업로드
+                      <input
+                        type="file"
+                        multiple
+                        accept="image/png,image/jpeg,image/webp"
+                        onChange={(event) => onImportExpressions(event.target.files)}
+                      />
+                    </Label>
+                    <Button
+                      disabled={characterCount <= 1}
+                      onClick={onDeleteCharacter}
+                      type="button"
+                      variant="destructive"
+                    >
+                      <HugeiconsIcon icon={Delete02Icon} size={18} aria-hidden />
+                      캐릭터 삭제
+                    </Button>
+                  </div>
+
+                  <div className="expression-grid">
+                    {character.expressions.map((image) => (
+                      <figure key={image.id} className="expression-card">
+                        <Image src={image.dataUrl} alt={image.name} width={160} height={160} unoptimized />
+                        <figcaption>
+                          <span>{image.name}</span>
+                          <Button
+                            aria-label={`${image.name} 캐릭터 표정 삭제`}
+                            onClick={() => onDeleteExpression(image.id)}
+                            size="icon-sm"
+                            type="button"
+                            variant="ghost"
+                          >
+                            <HugeiconsIcon icon={Delete02Icon} size={14} aria-hidden />
+                          </Button>
+                        </figcaption>
+                      </figure>
+                    ))}
+                    {character.expressions.length === 0 ? (
+                      <p className="empty-state">아직 등록된 캐릭터 표정이 없습니다.</p>
+                    ) : null}
+                  </div>
+                </div>
+              ) : null}
+            </section>
+          );
+        })}
+      </div>
+
+      <SaveRow onSave={onSave} saved={saveState === "assets"} />
+    </>
+  );
+}
+
+function BackgroundPanel({
+  assets,
+  onSave,
+  onUpdate,
+  saveState,
+}: {
+  assets: StudioAssets;
+  onSave: () => void;
+  onUpdate: (background: StudioAssets["background"]) => void;
+  saveState: "idle" | "assets" | "settings";
+}) {
+  return (
+    <>
+      <div className="panel-heading">
+        <div>
+          <p className="eyebrow">Background</p>
+          <h2>배경 설정</h2>
+          <p>컷 생성에 참고할 배경 이름, 프롬프트, 색상을 저장합니다.</p>
+        </div>
+      </div>
+
+      <Label className="field-stack">
+        배경 이름
+        <Input
+          value={assets.background.name}
+          onChange={(event) => onUpdate({ ...assets.background, name: event.target.value })}
+        />
+      </Label>
+
+      <Label className="field-stack">
+        배경 프롬프트
+        <Textarea
+          value={assets.background.prompt}
+          rows={5}
+          onChange={(event) => onUpdate({ ...assets.background, prompt: event.target.value })}
+        />
+      </Label>
+
+      <Label className="field-stack">
+        배경 색상
+        <Input
+          type="color"
+          value={assets.background.color}
+          onChange={(event) => onUpdate({ ...assets.background, color: event.target.value })}
+        />
+      </Label>
+
+      <div className="asset-preview" style={{ background: assets.background.color }}>
+        <strong>{assets.background.name}</strong>
+        <span>{assets.background.prompt}</span>
+      </div>
+
+      <SaveRow onSave={onSave} saved={saveState === "assets"} />
+    </>
+  );
+}
+
+function FontsPanel({
+  assets,
+  onSave,
+  onUpdate,
+  saveState,
+}: {
+  assets: StudioAssets;
+  onSave: () => void;
+  onUpdate: (fonts: StudioAssets["fonts"]) => void;
+  saveState: "idle" | "assets" | "settings";
+}) {
+  return (
+    <>
+      <div className="panel-heading">
+        <div>
+          <p className="eyebrow">Fonts</p>
+          <h2>폰트 설정</h2>
+          <p>HTML 미리보기와 내보내기에서 사용할 자막/대사 폰트를 관리합니다.</p>
+        </div>
+      </div>
+
+      <div className="form-grid compact">
+        <Label className="field-stack">
+          자막 폰트
+          <FontSelect
+            value={assets.fonts.subtitle}
+            onChange={(value) => onUpdate({ ...assets.fonts, subtitle: value })}
+          />
+        </Label>
+        <Label className="field-stack">
+          대사 폰트
+          <FontSelect
+            value={assets.fonts.dialogue}
+            onChange={(value) => onUpdate({ ...assets.fonts, dialogue: value })}
+          />
+        </Label>
+      </div>
+
+      <div className="asset-preview">
+        <strong style={{ fontFamily: assets.fonts.subtitle }}>자막 폰트 미리보기</strong>
+        <span style={{ fontFamily: assets.fonts.dialogue }}>
+          대사 폰트가 적용된 문장입니다. 컷 안의 텍스트는 이미지에 굽지 않고 HTML/CSS로 렌더링합니다.
+        </span>
+      </div>
+
+      <SaveRow onSave={onSave} saved={saveState === "assets"} />
+    </>
+  );
+}
+
+function ApiKeyPanel({
+  onSave,
+  onUpdate,
+  saveState,
+  settings,
+}: {
+  onSave: () => void;
+  onUpdate: (patch: Partial<StudioSettings>) => void;
+  saveState: "idle" | "assets" | "settings";
+  settings: StudioSettings;
+}) {
+  const apiKeyReady = settings.geminiApiKey.trim().length > 0;
+
+  return (
+    <>
+      <div className="panel-heading">
+        <div>
+          <p className="eyebrow">API Key</p>
+          <h2>API Key 등록</h2>
+          <p>이미지 생성에 사용할 Gemini API Key를 브라우저 로컬 저장소에 저장합니다.</p>
+        </div>
+        <span className={apiKeyReady ? "status-pill ready" : "status-pill warning"}>
+          {apiKeyReady ? "Ready" : "API Key 필요"}
+        </span>
+      </div>
+
+      <Label className="field-stack">
+        Gemini API Key
+        <Input
+          type="password"
+          value={settings.geminiApiKey}
+          placeholder="브라우저 로컬 저장소에만 저장됩니다."
+          onChange={(event) => onUpdate({ geminiApiKey: event.target.value })}
+        />
+      </Label>
+
+      <div className="notice-panel">
+        Provider 선택은 제거되었고 Gemini API Key 등록을 기본 설정으로 사용합니다. Google 로그인만으로
+        유료 API 사용을 우회하는 기능은 제공하지 않습니다.
+      </div>
+
+      <SaveRow onSave={onSave} saved={saveState === "settings"} />
+    </>
+  );
+}
+
+function ExportPanel({
+  assets,
+  onSave,
+  onUpdate,
+  saveState,
+  settings,
+}: {
+  assets: StudioAssets;
+  onSave: () => void;
+  onUpdate: (patch: Partial<StudioSettings>) => void;
+  saveState: "idle" | "assets" | "settings";
+  settings: StudioSettings;
+}) {
+  return (
+    <>
+      <div className="panel-heading">
+        <div>
+          <p className="eyebrow">Export</p>
+          <h2>내보내기 옵션</h2>
+          <p>PNG/ZIP 다운로드와 provider payload preview 옵션을 저장합니다.</p>
+        </div>
+      </div>
+
+      <Label className="field-stack">
+        PNG 기준 해상도
+        <Select
+          value={settings.exportScale}
+          onValueChange={(value) => onUpdate({ exportScale: value as StudioSettings["exportScale"] })}
+        >
+          <SelectTrigger>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="1080">1080 기준</SelectItem>
+            <SelectItem value="2160">2160 기준</SelectItem>
+          </SelectContent>
+        </Select>
+      </Label>
+
+      <Label className="check-row">
+        <input
+          type="checkbox"
+          checked={settings.saveOriginalHtml}
+          onChange={(event) => onUpdate({ saveOriginalHtml: event.target.checked })}
+        />
+        HTML 원본을 프로젝트 데이터에 함께 유지
+      </Label>
+
+      <Label className="field-stack">
+        Provider payload preview
+        <Textarea readOnly rows={10} value={buildPreview(assets, settings)} />
+      </Label>
+
+      <SaveRow onSave={onSave} saved={saveState === "settings"} />
+    </>
+  );
+}
+
+function SaveRow({ onSave, saved }: { onSave: () => void; saved: boolean }) {
+  return (
+    <div className="toolbar-row">
+      <Button type="button" onClick={onSave}>
+        저장
+      </Button>
+      <p className="save-state save-state-saved">{saved ? "저장 완료" : ""}</p>
+    </div>
   );
 }
 
@@ -219,13 +692,263 @@ function FontSelect({ value, onChange }: { value: string; onChange: (value: stri
   );
 }
 
+function buildPreview(assets: StudioAssets, settings: StudioSettings) {
+  const selectedCharacter =
+    assets.characters.find((character) => character.id === assets.selectedCharacterId) ?? assets.characters[0];
+
+  return JSON.stringify(
+    {
+      provider: "gemini",
+      apiKeyRegistered: settings.geminiApiKey.trim().length > 0,
+      promptParts: [
+        "cut.imagePrompt",
+        "selectedCharacter.markdown",
+        "selectedCharacter.expressions",
+        "assets.background.prompt",
+      ],
+      selectedCharacter: {
+        name: selectedCharacter.name,
+        expressionCount: selectedCharacter.expressions.length,
+      },
+      output: {
+        exportScale: settings.exportScale,
+        saveOriginalHtml: settings.saveOriginalHtml,
+        textInImage: false,
+        finalDownload: "HTML rendered PNG",
+        bundle: "ZIP per cut",
+      },
+    },
+    null,
+    2,
+  );
+}
+
 function loadAssets(): StudioAssets {
   if (typeof window === "undefined") {
-    return defaultAssets;
+    return createDefaultAssets();
   }
 
-  const saved = window.localStorage.getItem(storageKey);
-  return saved ? { ...defaultAssets, ...JSON.parse(saved) } : defaultAssets;
+  try {
+    const saved = window.localStorage.getItem(assetsStorageKey);
+    return saved ? migrateAssets(JSON.parse(saved)) : createDefaultAssets();
+  } catch {
+    return createDefaultAssets();
+  }
+}
+
+function loadInitialSection(): AssetSection {
+  if (typeof window === "undefined") {
+    return "characters";
+  }
+
+  const section = new URLSearchParams(window.location.search).get("section");
+  return isAssetSection(section) ? section : "characters";
+}
+
+function useHydrated() {
+  return useSyncExternalStore(subscribeToHydration, getClientHydrationSnapshot, getServerHydrationSnapshot);
+}
+
+function subscribeToHydration() {
+  return () => undefined;
+}
+
+function getClientHydrationSnapshot() {
+  return true;
+}
+
+function getServerHydrationSnapshot() {
+  return false;
+}
+
+function loadSettings(): StudioSettings {
+  if (typeof window === "undefined") {
+    return createDefaultSettings();
+  }
+
+  try {
+    const saved = window.localStorage.getItem(settingsStorageKey);
+    return saved ? migrateSettings(JSON.parse(saved)) : createDefaultSettings();
+  } catch {
+    return createDefaultSettings();
+  }
+}
+
+function migrateAssets(value: unknown): StudioAssets {
+  if (!isRecord(value)) {
+    return createDefaultAssets();
+  }
+
+  if (Array.isArray(value.characters)) {
+    return ensureAssets({
+      version: 2,
+      characters: value.characters.map(normalizeCharacter).filter(Boolean) as CharacterAsset[],
+      selectedCharacterId:
+        typeof value.selectedCharacterId === "string" ? value.selectedCharacterId : "character-default",
+      background: {
+        name: getString(getRecord(value.background)?.name, "studio-room"),
+        prompt: getString(
+          getRecord(value.background)?.prompt,
+          "clean local studio room, soft daylight, editorial webtoon background, no text",
+        ),
+        color: getString(getRecord(value.background)?.color, "#f7f7f7"),
+      },
+      fonts: {
+        subtitle: getString(getRecord(value.fonts)?.subtitle, "Pretendard"),
+        dialogue: getString(getRecord(value.fonts)?.dialogue, "Pretendard"),
+      },
+    });
+  }
+
+  const legacyCharacter = createCharacter(
+    getString(value.characterName, "clo"),
+    getString(value.characterMarkdown, defaultMarkdown),
+    normalizeExpressions(value.expressions),
+  );
+
+  return ensureAssets({
+    version: 2,
+    characters: [legacyCharacter],
+    selectedCharacterId: legacyCharacter.id,
+    background: {
+      name: getString(value.backgroundName, "studio-room"),
+      prompt: getString(
+        value.backgroundPrompt,
+        "clean local studio room, soft daylight, editorial webtoon background, no text",
+      ),
+      color: getString(value.backgroundColor, "#f7f7f7"),
+    },
+    fonts: {
+      subtitle: getString(value.subtitleFont, "Pretendard"),
+      dialogue: getString(value.dialogueFont, "Pretendard"),
+    },
+  });
+}
+
+function migrateSettings(value: unknown): StudioSettings {
+  if (!isRecord(value)) {
+    return createDefaultSettings();
+  }
+
+  return {
+    provider: "gemini",
+    geminiApiKey: getString(value.geminiApiKey, ""),
+    exportScale: value.exportScale === "2160" ? "2160" : "1080",
+    saveOriginalHtml: typeof value.saveOriginalHtml === "boolean" ? value.saveOriginalHtml : true,
+  };
+}
+
+function ensureAssets(assets: StudioAssets): StudioAssets {
+  const characters = assets.characters.length > 0 ? assets.characters : [createCharacter("clo")];
+  const selectedCharacterId = characters.some((character) => character.id === assets.selectedCharacterId)
+    ? assets.selectedCharacterId
+    : characters[0].id;
+
+  return {
+    ...assets,
+    characters,
+    selectedCharacterId,
+  };
+}
+
+function createDefaultAssets(): StudioAssets {
+  const character = createCharacter("clo", defaultMarkdown);
+
+  return {
+    version: 2,
+    characters: [character],
+    selectedCharacterId: character.id,
+    background: {
+      name: "studio-room",
+      prompt: "clean local studio room, soft daylight, editorial webtoon background, no text",
+      color: "#f7f7f7",
+    },
+    fonts: {
+      subtitle: "Pretendard",
+      dialogue: "Pretendard",
+    },
+  };
+}
+
+function createDefaultSettings(): StudioSettings {
+  return {
+    provider: "gemini",
+    geminiApiKey: "",
+    exportScale: "1080",
+    saveOriginalHtml: true,
+  };
+}
+
+function createCharacter(name: string, markdown = defaultMarkdown, expressions: ExpressionImage[] = []) {
+  return {
+    id: createId("character"),
+    name,
+    markdown,
+    expressions,
+  };
+}
+
+function normalizeCharacter(value: unknown) {
+  if (!isRecord(value)) {
+    return null;
+  }
+
+  return {
+    id: getString(value.id, createId("character")),
+    name: getString(value.name, "새 캐릭터"),
+    markdown: getString(value.markdown, defaultMarkdown),
+    expressions: normalizeExpressions(value.expressions),
+  };
+}
+
+function normalizeExpressions(value: unknown): ExpressionImage[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .map((item) => {
+      if (!isRecord(item)) {
+        return null;
+      }
+
+      const dataUrl = getString(item.dataUrl, "");
+
+      if (!dataUrl) {
+        return null;
+      }
+
+      return {
+        id: getString(item.id, createId("expression")),
+        name: getString(item.name, "캐릭터 표정"),
+        dataUrl,
+      };
+    })
+    .filter((item): item is ExpressionImage => item !== null);
+}
+
+function isAssetSection(value: string | null): value is AssetSection {
+  return value === "characters" || value === "background" || value === "fonts" || value === "api-key" || value === "export";
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+function getRecord(value: unknown) {
+  return isRecord(value) ? value : null;
+}
+
+function getString(value: unknown, fallback: string) {
+  return typeof value === "string" ? value : fallback;
+}
+
+function createId(prefix: string) {
+  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
+    return `${prefix}-${crypto.randomUUID()}`;
+  }
+
+  return `${prefix}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
 
 function readFileAsDataUrl(file: File) {

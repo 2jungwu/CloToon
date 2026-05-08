@@ -5,8 +5,7 @@ import { usePathname } from "next/navigation";
 
 const navItems = [
   { href: "/projects", label: "Projects", activePrefixes: ["/projects", "/workspace"] },
-  { href: "/assets", label: "Assets", activePrefixes: ["/assets"] },
-  { href: "/settings", label: "Settings", activePrefixes: ["/settings"] },
+  { href: "/assets", label: "Assets", activePrefixes: ["/assets", "/settings"] },
 ];
 
 export function AppNav() {
