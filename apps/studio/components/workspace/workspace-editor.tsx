@@ -401,8 +401,8 @@ export function WorkspaceEditor({ project, initialCuts }: WorkspaceEditorProps) 
 
   return (
     <>
-      <section className="editor-grid" aria-label="제작 워크스페이스">
-        <div className="editor-panel">
+      <section className="split-layout workspace-layout" aria-label="제작 워크스페이스">
+        <aside className="split-menu workspace-menu" aria-label="Cuts menu">
           <div className="panel-heading">
             <div>
               <p className="eyebrow">Storyboard</p>
@@ -443,12 +443,13 @@ export function WorkspaceEditor({ project, initialCuts }: WorkspaceEditorProps) 
             </Button>
           </div>
 
-          <div className="cut-list" aria-label="컷 목록">
+          <div className="split-menu-list cut-list" aria-label="컷 목록">
             {sortedCuts.map((cut) => (
               <button
                 key={cut.id}
                 type="button"
-                className={cut.id === selectedCut?.id ? "cut-list-item active" : "cut-list-item"}
+                className="split-menu-item workspace-cut-item"
+                data-active={cut.id === selectedCut?.id}
                 onClick={() => setSelectedCutId(cut.id)}
               >
                 <span>#{cut.position}</span>
@@ -457,161 +458,165 @@ export function WorkspaceEditor({ project, initialCuts }: WorkspaceEditorProps) 
               </button>
             ))}
           </div>
-        </div>
-
-        <div className="editor-panel">
-          {selectedCut ? (
-            <>
-              <div className="panel-heading inline-heading">
-                <div>
-                  <p className="eyebrow">Cut {selectedCut.position}</p>
-                  <h2>자막, 대사, 프롬프트</h2>
-                </div>
-                <Badge className={`badge-${selectedCut.template === "card-news" ? "card-news" : "comic"}`}>
-                  {templateLabels[selectedCut.template]}
-                </Badge>
-              </div>
-
-              <div className="form-grid compact">
-                <Label className="field-stack">
-                  템플릿
-                  <Select
-                    value={selectedCut.template}
-                    onValueChange={(value) => updateSelectedCut("template", value)}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="comic">인스타툰</SelectItem>
-                      <SelectItem value="card-news">카드뉴스</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </Label>
-                <Label className="field-stack">
-                  이미지 상태
-                  <Input value={statusLabels[selectedCut.imageStatus]} readOnly />
-                </Label>
-              </div>
-
-              <Label className="field-stack">
-                컷 시나리오
-                <Textarea
-                  value={selectedCut.scenario}
-                  onChange={(event) => updateSelectedCut("scenario", event.target.value)}
-                  rows={4}
-                />
-              </Label>
-              <Label className="field-stack">
-                자막
-                <Input
-                  value={selectedCut.caption}
-                  onChange={(event) => updateSelectedCut("caption", event.target.value)}
-                />
-              </Label>
-              <Label className="field-stack">
-                대사
-                <Textarea
-                  value={selectedCut.dialogue}
-                  onChange={(event) => updateSelectedCut("dialogue", event.target.value)}
-                  rows={3}
-                />
-              </Label>
-              <Label className="field-stack">
-                이미지 프롬프트
-                <Textarea
-                  value={selectedCut.imagePrompt}
-                  onChange={(event) => updateSelectedCut("imagePrompt", event.target.value)}
-                  rows={4}
-                />
-              </Label>
-              <Label className="field-stack">
-                네거티브 프롬프트
-                <Textarea
-                  value={selectedCut.negativePrompt}
-                  onChange={(event) => updateSelectedCut("negativePrompt", event.target.value)}
-                  rows={3}
-                />
-              </Label>
-
-              <div className="toolbar-row">
-                <Button
-                  type="button"
-                  onClick={generateSelectedCutImage}
-                  disabled={generationState.status === "generating"}
-                >
-                  {generationState.status === "generating" ? "이미지 생성 중..." : "이미지 생성"}
-                </Button>
-                <Button type="button" variant="secondary" onClick={applyMockImage}>
-                  Mock 이미지
-                </Button>
-                <Label className="upload-button">
-                  이미지 업로드
-                  <input
-                    type="file"
-                    accept="image/png,image/jpeg,image/webp"
-                    onChange={(event) => handleUpload(event.target.files?.[0] ?? null)}
-                  />
-                </Label>
-              </div>
-
-              <div className="toolbar-row muted-actions">
-                <Button type="button" variant="secondary" onClick={() => moveCut(selectedCut, -1)}>
-                  <HugeiconsIcon icon={ArrowUp01Icon} size={18} aria-hidden />
-                  위로
-                </Button>
-                <Button type="button" variant="secondary" onClick={() => moveCut(selectedCut, 1)}>
-                  <HugeiconsIcon icon={ArrowDown01Icon} size={18} aria-hidden />
-                  아래로
-                </Button>
-                <Button type="button" variant="secondary" onClick={() => duplicateCut(selectedCut)}>
-                  <HugeiconsIcon icon={Copy01Icon} size={18} aria-hidden />
-                  복제
-                </Button>
-                <Button type="button" variant="destructive" onClick={() => deleteCut(selectedCut)}>
-                  <HugeiconsIcon icon={Delete02Icon} size={18} aria-hidden />
-                  삭제
-                </Button>
-              </div>
-
-              <p className={`save-state save-state-${getStatusMessageClass(saveState, generationState.status)}`}>
-                {generationState.message ||
-                  (saveState === "saving" && "저장 중...") ||
-                  (saveState === "saved" && "저장 완료") ||
-                  (saveState === "error" && "저장 실패") ||
-                  ""}
-              </p>
-            </>
-          ) : (
-            <p>선택할 컷이 없습니다.</p>
-          )}
-        </div>
-
-        <aside className="preview-column">
-          <div className="preview-toolbar">
-            <div>
-              <p className="eyebrow">HTML Preview</p>
-              <h2>이미지 원본</h2>
-            </div>
-            <Badge className="badge-canvas">{project.canvasPreset}</Badge>
-          </div>
-
-          {selectedCut ? <CutPreview cut={selectedCut} project={project} /> : null}
-
-          <div className="toolbar-row export-actions">
-            <Button type="button" onClick={downloadCurrentCut}>
-              현재 컷 PNG
-            </Button>
-            <Button type="button" variant="secondary" onClick={downloadAllCutsZip}>
-              전체 ZIP
-            </Button>
-          </div>
-          <p className={`save-state save-state-${exportState}`}>
-            {exportState === "exporting" && "내보내는 중..."}
-            {exportState === "done" && "다운로드 생성 완료"}
-            {exportState === "error" && "다운로드 실패"}
-          </p>
         </aside>
+
+        <div className="split-content workspace-detail">
+          <div className="workspace-detail-grid">
+            <div className="editor-panel">
+              {selectedCut ? (
+                <>
+                  <div className="panel-heading inline-heading">
+                    <div>
+                      <p className="eyebrow">Cut {selectedCut.position}</p>
+                      <h2>자막, 대사, 프롬프트</h2>
+                    </div>
+                    <Badge className={`badge-${selectedCut.template === "card-news" ? "card-news" : "comic"}`}>
+                      {templateLabels[selectedCut.template]}
+                    </Badge>
+                  </div>
+
+                  <div className="form-grid compact">
+                    <Label className="field-stack">
+                      템플릿
+                      <Select
+                        value={selectedCut.template}
+                        onValueChange={(value) => updateSelectedCut("template", value)}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="comic">인스타툰</SelectItem>
+                          <SelectItem value="card-news">카드뉴스</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </Label>
+                    <Label className="field-stack">
+                      이미지 상태
+                      <Input value={statusLabels[selectedCut.imageStatus]} readOnly />
+                    </Label>
+                  </div>
+
+                  <Label className="field-stack">
+                    컷 시나리오
+                    <Textarea
+                      value={selectedCut.scenario}
+                      onChange={(event) => updateSelectedCut("scenario", event.target.value)}
+                      rows={4}
+                    />
+                  </Label>
+                  <Label className="field-stack">
+                    자막
+                    <Input
+                      value={selectedCut.caption}
+                      onChange={(event) => updateSelectedCut("caption", event.target.value)}
+                    />
+                  </Label>
+                  <Label className="field-stack">
+                    대사
+                    <Textarea
+                      value={selectedCut.dialogue}
+                      onChange={(event) => updateSelectedCut("dialogue", event.target.value)}
+                      rows={3}
+                    />
+                  </Label>
+                  <Label className="field-stack">
+                    이미지 프롬프트
+                    <Textarea
+                      value={selectedCut.imagePrompt}
+                      onChange={(event) => updateSelectedCut("imagePrompt", event.target.value)}
+                      rows={4}
+                    />
+                  </Label>
+                  <Label className="field-stack">
+                    네거티브 프롬프트
+                    <Textarea
+                      value={selectedCut.negativePrompt}
+                      onChange={(event) => updateSelectedCut("negativePrompt", event.target.value)}
+                      rows={3}
+                    />
+                  </Label>
+
+                  <div className="toolbar-row">
+                    <Button
+                      type="button"
+                      onClick={generateSelectedCutImage}
+                      disabled={generationState.status === "generating"}
+                    >
+                      {generationState.status === "generating" ? "이미지 생성 중..." : "이미지 생성"}
+                    </Button>
+                    <Button type="button" variant="secondary" onClick={applyMockImage}>
+                      Mock 이미지
+                    </Button>
+                    <Label className="upload-button">
+                      이미지 업로드
+                      <input
+                        type="file"
+                        accept="image/png,image/jpeg,image/webp"
+                        onChange={(event) => handleUpload(event.target.files?.[0] ?? null)}
+                      />
+                    </Label>
+                  </div>
+
+                  <div className="toolbar-row muted-actions">
+                    <Button type="button" variant="secondary" onClick={() => moveCut(selectedCut, -1)}>
+                      <HugeiconsIcon icon={ArrowUp01Icon} size={18} aria-hidden />
+                      위로
+                    </Button>
+                    <Button type="button" variant="secondary" onClick={() => moveCut(selectedCut, 1)}>
+                      <HugeiconsIcon icon={ArrowDown01Icon} size={18} aria-hidden />
+                      아래로
+                    </Button>
+                    <Button type="button" variant="secondary" onClick={() => duplicateCut(selectedCut)}>
+                      <HugeiconsIcon icon={Copy01Icon} size={18} aria-hidden />
+                      복제
+                    </Button>
+                    <Button type="button" variant="destructive" onClick={() => deleteCut(selectedCut)}>
+                      <HugeiconsIcon icon={Delete02Icon} size={18} aria-hidden />
+                      삭제
+                    </Button>
+                  </div>
+
+                  <p className={`save-state save-state-${getStatusMessageClass(saveState, generationState.status)}`}>
+                    {generationState.message ||
+                      (saveState === "saving" && "저장 중...") ||
+                      (saveState === "saved" && "저장 완료") ||
+                      (saveState === "error" && "저장 실패") ||
+                      ""}
+                  </p>
+                </>
+              ) : (
+                <p>선택할 컷이 없습니다.</p>
+              )}
+            </div>
+
+            <aside className="preview-column">
+              <div className="preview-toolbar">
+                <div>
+                  <p className="eyebrow">HTML Preview</p>
+                  <h2>이미지 원본</h2>
+                </div>
+                <Badge className="badge-canvas">{project.canvasPreset}</Badge>
+              </div>
+
+              {selectedCut ? <CutPreview cut={selectedCut} project={project} /> : null}
+
+              <div className="toolbar-row export-actions">
+                <Button type="button" onClick={downloadCurrentCut}>
+                  현재 컷 PNG
+                </Button>
+                <Button type="button" variant="secondary" onClick={downloadAllCutsZip}>
+                  전체 ZIP
+                </Button>
+              </div>
+              <p className={`save-state save-state-${exportState}`}>
+                {exportState === "exporting" && "내보내는 중..."}
+                {exportState === "done" && "다운로드 생성 완료"}
+                {exportState === "error" && "다운로드 실패"}
+              </p>
+            </aside>
+          </div>
+        </div>
       </section>
 
       <div className="export-stack" ref={exportRootRef} aria-hidden>

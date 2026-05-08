@@ -1001,6 +1001,112 @@ textarea::placeholder {
   gap: 24px;
 }
 
+.project-layout,
+.workspace-layout {
+  max-width: 100%;
+}
+
+.project-layout .project-form,
+.project-summary,
+.workspace-layout .editor-panel {
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  display: grid;
+  gap: 24px;
+  padding: 0;
+}
+
+.project-menu-item,
+.workspace-cut-item {
+  display: grid;
+  gap: 4px;
+}
+
+.project-menu-item span,
+.workspace-cut-item strong {
+  color: inherit;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.project-menu-item small,
+.workspace-cut-item small,
+.workspace-cut-item span {
+  color: var(--app-text-secondary);
+  font-size: 13px;
+  font-weight: 600;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.project-summary .panel-heading > span {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.project-preview {
+  min-height: 180px;
+}
+
+.workspace-layout {
+  grid-template-columns: minmax(220px, 300px) minmax(0, 1fr);
+}
+
+.workspace-menu {
+  display: grid;
+  gap: 18px;
+}
+
+.workspace-menu .form-grid.compact {
+  grid-template-columns: 1fr;
+}
+
+.workspace-menu .toolbar-row [data-slot="button"] {
+  flex: 1 1 100%;
+}
+
+.workspace-detail-grid {
+  align-items: start;
+  display: grid;
+  gap: 40px;
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 360px);
+}
+
+.workspace-layout .preview-column {
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  color: var(--app-text);
+  justify-items: stretch;
+  margin-inline: 0;
+  overflow: visible;
+  padding: 0;
+}
+
+.workspace-layout .preview-toolbar h2 {
+  color: var(--app-text);
+  font-size: 24px;
+  font-weight: 800;
+  line-height: 1.25;
+  margin: 0;
+}
+
+.workspace-layout .preview-toolbar {
+  color: var(--app-text);
+}
+
+.workspace-layout .cut-canvas {
+  justify-self: center;
+}
+
 .character-disclosure-list {
   display: grid;
   gap: 0;
@@ -1253,6 +1359,7 @@ textarea::placeholder {
 @media (max-width: 992px) {
   .workspace-grid,
   .editor-grid,
+  .workspace-detail-grid,
   .split-layout {
     grid-template-columns: 1fr;
     gap: 28px;
