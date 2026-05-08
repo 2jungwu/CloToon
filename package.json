@@ -1,42 +1,16 @@
 {
-  "name": "local-comic-card-studio",
+  "name": "local-comic-card-studio-monorepo",
   "version": "0.1.0",
   "private": true,
-  "description": "Localhost-based studio for creating Instagram comics and card news.",
+  "description": "Monorepo for the localhost-based Instagram comic and card news studio.",
+  "workspaces": [
+    "apps/*"
+  ],
   "scripts": {
-    "dev": "next dev --hostname 127.0.0.1 --port 3000",
-    "build": "next build",
-    "start": "next start --hostname 127.0.0.1 --port 3000",
-    "lint": "eslint .",
-    "typecheck": "tsc --noEmit"
-  },
-  "dependencies": {
-    "@hugeicons/core-free-icons": "^4.1.1",
-    "@hugeicons/react": "^1.1.6",
-    "@tailwindcss/postcss": "^4.2.4",
-    "better-sqlite3": "^12.9.0",
-    "class-variance-authority": "^0.7.1",
-    "clsx": "^2.1.1",
-    "html-to-image": "^1.11.13",
-    "jszip": "^3.10.1",
-    "next": "^16.2.4",
-    "postcss": "^8.5.14",
-    "radix-ui": "^1.4.3",
-    "react": "^19.2.5",
-    "react-dom": "^19.2.5",
-    "shadcn": "^4.7.0",
-    "tailwind-merge": "^3.5.0",
-    "tailwindcss": "^4.2.4",
-    "tw-animate-css": "^1.4.0",
-    "zod": "^4.4.3"
-  },
-  "devDependencies": {
-    "@types/better-sqlite3": "^7.6.13",
-    "@types/node": "^25.6.0",
-    "@types/react": "^19.2.14",
-    "@types/react-dom": "^19.2.3",
-    "eslint": "^9.39.4",
-    "eslint-config-next": "^16.2.4",
-    "typescript": "^6.0.3"
+    "dev": "npm --workspace @local-comic-card-studio/studio run dev",
+    "build": "npm --workspace @local-comic-card-studio/studio run build",
+    "start": "npm --workspace @local-comic-card-studio/studio run start",
+    "lint": "npm --workspace @local-comic-card-studio/studio run lint",
+    "typecheck": "npm --workspace @local-comic-card-studio/studio run typecheck"
   }
 }

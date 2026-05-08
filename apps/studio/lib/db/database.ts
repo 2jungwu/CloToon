@@ -2,7 +2,7 @@ import Database from "better-sqlite3";
 import fs from "node:fs";
 import path from "node:path";
 
-const dataDir = path.join(process.cwd(), "data");
+const dataDir = resolveDataDir();
 const dbPath = path.join(dataDir, "app.db");
 
 let database: Database.Database | null = null;
@@ -62,5 +62,45 @@ function addColumnIfMissing(
 
   if (!columns.some((column) => column.name === columnName)) {
     db.exec(`ALTER TABLE ${tableName} ADD COLUMN ${columnName} ${definition}`);
+  }
+}
+
+function resolveDataDir() {
+  const configuredDataDir = process.env.LOCAL_STUDIO_DATA_DIR;
+
+  if (configuredDataDir) {
+    return path.resolve(configuredDataDir);
+  }
+
+  return path.join(findWorkspaceRoot(process.cwd()), "data");
+}
+
+function findWorkspaceRoot(startDir: string) {
+  let currentDir = startDir;
+
+  while (true) {
+    const packageJsonPath = path.join(currentDir, "package.json");
+
+    if (fs.existsSync(packageJsonPath)) {
+      try {
+        const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, "utf8")) as {
+          workspaces?: unknown;
+        };
+
+        if (packageJson.workspaces) {
+          return currentDir;
+        }
+      } catch {
+        // Keep walking upward if a package file is unreadable or malformed.
+      }
+    }
+
+    const parentDir = path.dirname(currentDir);
+
+    if (parentDir === currentDir) {
+      return startDir;
+    }
+
+    currentDir = parentDir;
   }
 }

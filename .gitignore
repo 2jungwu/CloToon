@@ -1,8 +1,12 @@
 node_modules/
 .next/
+apps/*/.next/
 out/
+apps/*/out/
 dist/
+apps/*/dist/
 coverage/
+artifacts/
 *.tsbuildinfo
 .env
 .env.local

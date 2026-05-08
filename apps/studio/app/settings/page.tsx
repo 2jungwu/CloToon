@@ -24,7 +24,7 @@ type StudioSettings = {
 const storageKey = "local-studio-settings";
 
 const defaultSettings: StudioSettings = {
-  provider: "mock",
+  provider: "gemini",
   geminiApiKey: "",
   exportScale: "1080",
   saveOriginalHtml: true,

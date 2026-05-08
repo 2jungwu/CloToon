@@ -6,6 +6,9 @@ import { AppNav } from "@/components/app-nav";
 export const metadata: Metadata = {
   title: "Local Comic Card Studio",
   description: "Localhost studio for Instagram comics and card news.",
+  icons: {
+    icon: "/icon.svg",
+  },
 };
 
 export default function RootLayout({

@@ -205,27 +205,24 @@ export function WorkspaceEditor({ project, initialCuts }: WorkspaceEditorProps) 
     }
 
     const segments = splitScenario(scenario, count);
-    const missing = Math.max(0, count - cuts.length);
+    const sorted = [...cuts].sort((a, b) => a.position - b.position);
+    const existingCuts = sorted.slice(0, count);
 
-    for (let index = 0; index < missing; index += 1) {
-      const position = cuts.length + index + 1;
-      await createCut(position, segments[index] ?? "");
-    }
+    await Promise.all(
+      existingCuts.map((cut, index) =>
+        persistCutPatch(cut, {
+          scenario: segments[index] ?? cut.scenario,
+          caption: cut.caption || `컷 ${index + 1}`,
+          dialogue: cut.dialogue || segments[index] || "",
+          imagePrompt:
+            cut.imagePrompt ||
+            `consistent character illustration, ${segments[index] ?? scenario}, clean editorial composition, no text`,
+        }),
+      ),
+    );
 
-    if (cuts.length >= count) {
-      const updates = cuts
-        .slice(0, count)
-        .map((cut, index) =>
-          persistCutPatch(cut, {
-            scenario: segments[index] ?? cut.scenario,
-            caption: cut.caption || `컷 ${index + 1}`,
-            dialogue: cut.dialogue || segments[index] || "",
-            imagePrompt:
-              cut.imagePrompt ||
-              `consistent character illustration, ${segments[index] ?? scenario}, clean editorial composition, no text`,
-          }),
-        );
-      await Promise.all(updates);
+    for (let index = existingCuts.length; index < count; index += 1) {
+      await createCut(index + 1, segments[index] ?? "");
     }
   }
 
