@@ -70,13 +70,15 @@ const labels = {
   studio: "\uc2a4\ud29c\ub514\uc624",
   workbench: "\uc6cc\ud06c\ubca4\uce58",
   workbenchAria: "\uc2a4\ud29c\ub514\uc624 \uc6cc\ud06c\ubca4\uce58",
-  projectList: "\ud504\ub85c\uc81d\ud2b8 \ubaa9\ub85d",
+  projectsTitle: "\ud504\ub85c\uc81d\ud2b8",
+  newProject: "+ New",
+  cancel: "\ucde8\uc18c",
+  create: "\uc0dd\uc131",
+  creating: "\uc0dd\uc131 \uc911...",
   projectName: "\ud504\ub85c\uc81d\ud2b8 \uc774\ub984",
   projectNamePlaceholder: "\uc608: 5\uc6d4 \uce74\ub4dc\ub274\uc2a4 \uae30\ud68d",
   contentType: "\ucf58\ud150\uce20 \uc720\ud615",
   canvas: "\uce94\ubc84\uc2a4",
-  addProject: "\ud504\ub85c\uc81d\ud2b8 \ucd94\uac00",
-  addingProject: "\ucd94\uac00 \uc911...",
   deleteProject: "\uc0ad\uc81c",
   createProjectError: "\ud504\ub85c\uc81d\ud2b8\ub97c \ucd94\uac00\ud558\uc9c0 \ubabb\ud588\uc2b5\ub2c8\ub2e4.",
   deleteProjectError: "\ud504\ub85c\uc81d\ud2b8\ub97c \uc0ad\uc81c\ud558\uc9c0 \ubabb\ud588\uc2b5\ub2c8\ub2e4.",
@@ -189,6 +191,8 @@ export function StudioWorkbench({ initialProjectId }: StudioWorkbenchProps) {
   const [newProjectName, setNewProjectName] = useState("");
   const [newContentType, setNewContentType] = useState<ContentType>("comic");
   const [newCanvasPreset, setNewCanvasPreset] = useState<CanvasPreset>("1:1");
+  const [projectDrawerOpen] = useState(true);
+  const [projectCreateModalOpen, setProjectCreateModalOpen] = useState(false);
   const [projectActionError, setProjectActionError] = useState<string | null>(null);
   const [creatingProject, setCreatingProject] = useState(false);
   const [deletingProjectId, setDeletingProjectId] = useState("");
@@ -584,6 +588,7 @@ export function StudioWorkbench({ initialProjectId }: StudioWorkbenchProps) {
       setNewProjectName("");
       setProjectLoadState("ready");
       selectProject(createdProject);
+      setProjectCreateModalOpen(false);
     } catch {
       setProjectActionError(labels.createProjectError);
     } finally {
@@ -1045,19 +1050,16 @@ export function StudioWorkbench({ initialProjectId }: StudioWorkbenchProps) {
   return (
     <>
       <section className="split-layout workspace-layout studio-workbench-layout" aria-label={labels.workbenchAria}>
-        <ProjectRail
-          canvasPreset={newCanvasPreset}
-          contentType={newContentType}
-          creatingProject={creatingProject}
+        <ProjectDrawer
           deletingProjectId={deletingProjectId}
           error={projectActionError}
-          name={newProjectName}
-          onCanvasPresetChange={setNewCanvasPreset}
-          onContentTypeChange={setNewContentType}
-          onCreateProject={createProject}
           onDeleteProject={deleteProject}
-          onNameChange={setNewProjectName}
+          onNewProject={() => {
+            setProjectActionError(null);
+            setProjectCreateModalOpen(true);
+          }}
           onProjectSelect={handleProjectSelect}
+          open={projectDrawerOpen}
           projectLoadState={projectLoadState}
           projects={projects}
           selectedProjectId={selectedProjectId}
@@ -1104,6 +1106,25 @@ export function StudioWorkbench({ initialProjectId }: StudioWorkbenchProps) {
         />
       </section>
 
+      {projectCreateModalOpen ? (
+        <ProjectCreateModal
+          canvasPreset={newCanvasPreset}
+          contentType={newContentType}
+          creatingProject={creatingProject}
+          error={projectActionError}
+          name={newProjectName}
+          onCanvasPresetChange={setNewCanvasPreset}
+          onClose={() => {
+            if (!creatingProject) {
+              setProjectCreateModalOpen(false);
+            }
+          }}
+          onContentTypeChange={setNewContentType}
+          onCreateProject={createProject}
+          onNameChange={setNewProjectName}
+        />
+      ) : null}
+
       {selectedProject ? (
         <div className="export-stack" ref={exportRootRef} aria-hidden>
           {sortedCuts.map((cut) => (
@@ -1126,57 +1147,138 @@ type StudioChipProps = {
 };
 
 function StudioChip({ children }: StudioChipProps) {
-  return <span className="studio-chip">{children}</span>;
+  return <span className="ui-chip">{children}</span>;
 }
 
-type ProjectRailProps = {
-  canvasPreset: CanvasPreset;
-  contentType: ContentType;
-  creatingProject: boolean;
+type ProjectDrawerProps = {
   deletingProjectId: string;
   error: string | null;
-  name: string;
-  onCanvasPresetChange: (canvasPreset: CanvasPreset) => void;
-  onContentTypeChange: (contentType: ContentType) => void;
-  onCreateProject: (event: FormEvent<HTMLFormElement>) => void;
   onDeleteProject: (project: Project) => void;
-  onNameChange: (name: string) => void;
+  onNewProject: () => void;
   onProjectSelect: (projectId: string) => void;
+  open: boolean;
   projectLoadState: LoadState;
   projects: Project[];
   selectedProjectId: string;
 };
 
-function ProjectRail({
-  canvasPreset,
-  contentType,
-  creatingProject,
+function ProjectDrawer({
   deletingProjectId,
   error,
-  name,
-  onCanvasPresetChange,
-  onContentTypeChange,
-  onCreateProject,
   onDeleteProject,
-  onNameChange,
+  onNewProject,
   onProjectSelect,
+  open,
   projectLoadState,
   projects,
   selectedProjectId,
-}: ProjectRailProps) {
+}: ProjectDrawerProps) {
   return (
-    <aside className="split-menu workspace-menu project-rail" aria-label={labels.projectList}>
+    <aside
+      className="split-menu workspace-menu project-drawer"
+      aria-label={labels.projectsTitle}
+      data-open={open}
+    >
+      <div className="project-drawer-head">
+        <div>
+          <p className="eyebrow">{labels.studio}</p>
+          <h1>{labels.projectsTitle}</h1>
+        </div>
+        <button className="project-create-button" onClick={onNewProject} type="button">
+          {labels.newProject}
+        </button>
+      </div>
+
       <div className="storyboard-info">
-        <p className="eyebrow">{labels.studio}</p>
-        <h1 className="sr-only">{labels.studio}</h1>
         <p className="save-state">{getProjectLoadMessage(projectLoadState, projects.length)}</p>
       </div>
 
-      <form className="project-rail-form" onSubmit={onCreateProject}>
+      {error ? (
+        <p className="form-error" role="alert">
+          {error}
+        </p>
+      ) : null}
+
+      <div className="split-menu-list project-drawer-list">
+        {projects.map((project) => {
+          const active = project.id === selectedProjectId;
+
+          return (
+            <div className="project-drawer-row" data-active={active} key={project.id}>
+              <button
+                aria-current={active ? "page" : undefined}
+                className="split-menu-item project-menu-item"
+                onClick={() => onProjectSelect(project.id)}
+                type="button"
+              >
+                <span>{project.name}</span>
+                <span className="project-drawer-meta">
+                  <StudioChip>{contentTypeLabels[project.contentType]}</StudioChip>
+                  <StudioChip>{canvasPresetLabels[project.canvasPreset]}</StudioChip>
+                </span>
+              </button>
+              <button
+                aria-label={`${project.name} ${labels.deleteProject}`}
+                className="project-row-delete"
+                disabled={deletingProjectId === project.id}
+                onClick={() => onDeleteProject(project)}
+                type="button"
+              >
+                {labels.deleteProject}
+              </button>
+            </div>
+          );
+        })}
+      </div>
+    </aside>
+  );
+}
+
+type ProjectCreateModalProps = {
+  canvasPreset: CanvasPreset;
+  contentType: ContentType;
+  creatingProject: boolean;
+  error: string | null;
+  name: string;
+  onCanvasPresetChange: (canvasPreset: CanvasPreset) => void;
+  onClose: () => void;
+  onContentTypeChange: (contentType: ContentType) => void;
+  onCreateProject: (event: FormEvent<HTMLFormElement>) => void;
+  onNameChange: (name: string) => void;
+};
+
+function ProjectCreateModal({
+  canvasPreset,
+  contentType,
+  creatingProject,
+  error,
+  name,
+  onCanvasPresetChange,
+  onClose,
+  onContentTypeChange,
+  onCreateProject,
+  onNameChange,
+}: ProjectCreateModalProps) {
+  return (
+    <div className="project-modal-overlay" role="presentation">
+      <form
+        aria-labelledby="project-create-modal-title"
+        className="project-create-modal"
+        onSubmit={onCreateProject}
+        role="dialog"
+      >
+        <div className="project-modal-head">
+          <div>
+            <p className="eyebrow">{labels.projectsTitle}</p>
+            <h2 id="project-create-modal-title">{labels.create}</h2>
+          </div>
+        </div>
+
         <label className="field-stack">
           {labels.projectName}
           <Input
             aria-label={labels.projectName}
+            autoFocus
             onChange={(event) => onNameChange(event.target.value)}
             placeholder={labels.projectNamePlaceholder}
             value={name}
@@ -1213,49 +1315,22 @@ function ProjectRail({
           </Select>
         </label>
 
-        <Button disabled={creatingProject || name.trim().length === 0} type="submit">
-          {creatingProject ? labels.addingProject : labels.addProject}
-        </Button>
-
         {error ? (
           <p className="form-error" role="alert">
             {error}
           </p>
         ) : null}
+
+        <div className="project-modal-actions">
+          <Button disabled={creatingProject} onClick={onClose} type="button" variant="secondary">
+            {labels.cancel}
+          </Button>
+          <Button disabled={creatingProject || name.trim().length === 0} type="submit">
+            {creatingProject ? labels.creating : labels.create}
+          </Button>
+        </div>
       </form>
-
-      <div className="split-menu-list project-rail-list">
-        {projects.map((project) => {
-          const active = project.id === selectedProjectId;
-
-          return (
-            <div className="project-rail-row" data-active={active} key={project.id}>
-              <button
-                aria-current={active ? "page" : undefined}
-                className="split-menu-item project-menu-item"
-                onClick={() => onProjectSelect(project.id)}
-                type="button"
-              >
-                <span>{project.name}</span>
-                <span className="project-rail-meta">
-                  <StudioChip>{contentTypeLabels[project.contentType]}</StudioChip>
-                  <StudioChip>{canvasPresetLabels[project.canvasPreset]}</StudioChip>
-                </span>
-              </button>
-              <button
-                aria-label={`${project.name} ${labels.deleteProject}`}
-                className="project-row-delete"
-                disabled={deletingProjectId === project.id}
-                onClick={() => onDeleteProject(project)}
-                type="button"
-              >
-                {labels.deleteProject}
-              </button>
-            </div>
-          );
-        })}
-      </div>
-    </aside>
+    </div>
   );
 }
 

@@ -1212,31 +1212,35 @@ textarea::placeholder {
   white-space: nowrap;
 }
 
-.project-rail {
-  gap: 20px;
+.project-drawer {
+  gap: 18px;
 }
 
-.project-rail-form {
+.project-drawer[data-open="false"] {
+  display: none;
+}
+
+.project-drawer-head {
+  align-items: flex-start;
   border-bottom: 1px solid var(--app-border);
   display: grid;
-  gap: 12px;
-  padding-bottom: 20px;
+  gap: 16px;
+  padding-bottom: 18px;
 }
 
-.project-rail-form .field-stack {
-  gap: 7px;
-  font-size: 13px;
+.project-drawer-head h1 {
+  color: var(--app-text);
+  font-size: 26px;
+  font-weight: 800;
+  line-height: 1.18;
+  margin: 0;
 }
 
-.project-rail-form [data-slot="button"] {
-  width: 100%;
-}
-
-.project-rail-list {
+.project-drawer-list {
   gap: 8px;
 }
 
-.project-rail-row {
+.project-drawer-row {
   align-items: stretch;
   border-radius: 8px;
   display: grid;
@@ -1247,55 +1251,55 @@ textarea::placeholder {
     box-shadow 160ms ease;
 }
 
-.project-rail-row:hover,
-.project-rail-row:focus-within,
-.project-rail-row[data-active="true"] {
+.project-drawer-row:hover,
+.project-drawer-row:focus-within,
+.project-drawer-row[data-active="true"] {
   background: #ececf1;
 }
 
-.project-rail-row[data-active="true"] {
+.project-drawer-row[data-active="true"] {
   box-shadow: inset 3px 0 0 var(--app-blue);
 }
 
-.project-rail-row .project-menu-item {
+.project-drawer-row .project-menu-item {
   background: transparent;
   color: var(--app-text);
   padding-right: 52px;
 }
 
-.project-rail-row .project-menu-item:hover,
-.project-rail-row .project-menu-item:focus-visible {
+.project-drawer-row .project-menu-item:hover,
+.project-drawer-row .project-menu-item:focus-visible {
   background: transparent;
 }
 
-.project-rail-row .project-menu-item:focus-visible {
+.project-drawer-row .project-menu-item:focus-visible {
   box-shadow: inset 0 0 0 3px var(--app-focus);
   outline: 2px solid var(--app-blue);
   outline-offset: -2px;
 }
 
-.project-rail-row[data-active="true"] .project-menu-item {
+.project-drawer-row[data-active="true"] .project-menu-item {
   color: var(--app-blue);
 }
 
-.project-rail-meta {
+.project-drawer-meta {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
   min-width: 0;
 }
 
-.studio-chip {
+.ui-chip {
   align-items: center;
   background: rgba(0, 113, 227, 0.08);
-  border: 1px solid rgba(0, 113, 227, 0.14);
+  border: 0;
   border-radius: 999px;
   color: var(--app-blue);
   display: inline-flex;
-  font-size: 11px;
-  font-weight: 700;
+  font-size: 12px;
+  font-weight: 500;
   line-height: 1;
-  min-height: 22px;
+  min-height: 24px;
   max-width: 100%;
   overflow: hidden;
   padding: 0 8px;
@@ -1326,8 +1330,8 @@ textarea::placeholder {
     opacity 160ms ease;
 }
 
-.project-rail-row:hover .project-row-delete,
-.project-rail-row:focus-within .project-row-delete {
+.project-drawer-row:hover .project-row-delete,
+.project-drawer-row:focus-within .project-row-delete {
   opacity: 1;
   pointer-events: auto;
 }
@@ -1342,6 +1346,50 @@ textarea::placeholder {
 .project-row-delete:disabled {
   cursor: not-allowed;
   opacity: 0.45;
+}
+
+.project-modal-overlay {
+  align-items: center;
+  background: rgba(29, 29, 31, 0.38);
+  display: flex;
+  inset: 0;
+  justify-content: center;
+  padding: 24px;
+  position: fixed;
+  z-index: 80;
+}
+
+.project-create-modal {
+  background: #ffffff;
+  border-radius: 12px;
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.2), 0 8px 24px rgba(0, 0, 0, 0.12);
+  color: var(--app-text);
+  display: grid;
+  gap: 16px;
+  max-width: 440px;
+  padding: 24px;
+  width: min(100%, 440px);
+}
+
+.project-modal-head {
+  align-items: flex-start;
+  display: flex;
+  justify-content: space-between;
+}
+
+.project-modal-head h2 {
+  color: var(--app-text);
+  font-size: 24px;
+  font-weight: 800;
+  line-height: 1.24;
+  margin: 0;
+}
+
+.project-modal-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+  padding-top: 4px;
 }
 
 .project-summary .panel-heading > span {
@@ -2022,7 +2070,7 @@ textarea::placeholder {
     grid-template-columns: 1fr;
   }
 
-  .project-rail-row .project-menu-item {
+  .project-drawer-row .project-menu-item {
     padding-right: 58px;
   }
 
