@@ -1059,7 +1059,7 @@ export function StudioWorkbench({ initialProjectId }: StudioWorkbenchProps) {
 
   return (
     <>
-      <section className="split-layout workspace-layout studio-workbench-layout" aria-label={labels.workbenchAria}>
+      <section className="studio-workbench-shell" aria-label={labels.workbenchAria}>
         <ProjectDrawer
           deletingProjectId={deletingProjectId}
           error={projectActionError}
@@ -1072,45 +1072,77 @@ export function StudioWorkbench({ initialProjectId }: StudioWorkbenchProps) {
           selectedProjectId={selectedProjectId}
         />
 
-        <ProductionPanel
-          canvasPreset={canvasPreset}
-          contentType={contentType}
-          cutLoadState={cutLoadState}
-          cuts={cuts}
-          canIncreaseCutCount={Boolean(selectedProject) && cutLoadState !== "loading"}
-          exportSettings={studioPreferences.export}
-          exportState={exportState}
-          fullScenario={fullScenario}
-          generationState={generationState}
-          generationMessage={generationMessage}
-          imageGenerationAssets={imageGenerationAssets}
-          onBuildCardNewsInOnePass={buildCardNewsInOnePass}
-          onDecreaseCutCount={decreaseCutCount}
-          onFlushSelectedCut={() => {
-            if (selectedCut) {
-              flushPendingCutPatch(selectedCut.id);
-            }
-          }}
-          onGenerateSelectedCutImage={generateSelectedCutImage}
-          onFullScenarioChange={setFullScenario}
-          onIncreaseCutCount={increaseCutCount}
-          onSelectCut={selectCut}
-          onUpdateSelectedCut={updateSelectedCut}
-          projectName={projectName}
-          saveState={saveState}
-          selectedCut={selectedCut}
-          selectedProject={selectedProject}
-        />
+        <div className="studio-workbench-main">
+          <header className="studio-workbench-head">
+            <div>
+              <p className="eyebrow">{labels.workbench}</p>
+              <h2>{projectName || labels.selectProject}</h2>
+              {selectedProject ? (
+                <span className="project-context-chips">
+                  <StudioChip>{contentTypeLabels[contentType]}</StudioChip>
+                  <StudioChip>{canvasPresetLabels[canvasPreset]}</StudioChip>
+                  <StudioChip>{getSaveLabel(saveState)}</StudioChip>
+                </span>
+              ) : (
+                <p>{labels.selectProjectHelp}</p>
+              )}
+            </div>
+            {selectedProject ? (
+              <button
+                className="studio-workbench-delete"
+                disabled={deletingProjectId === selectedProject.id}
+                onClick={() => deleteProject(selectedProject)}
+                type="button"
+              >
+                {labels.deleteProject}
+              </button>
+            ) : null}
+          </header>
 
-        <ImagePreviewPanel
-          canvasPreset={canvasPreset}
-          cut={selectedCut}
-          exportState={exportState}
-          canDownloadAllCutsZip={sortedCuts.length > 0}
-          onDownloadAllCutsZip={downloadAllCutsZip}
-          onDownloadCurrentCut={downloadCurrentCut}
-          project={selectedProject}
-        />
+          <div className="studio-workbench-grid">
+            <CutList
+              cutLoadState={cutLoadState}
+              cuts={cuts}
+              canIncreaseCutCount={Boolean(selectedProject) && cutLoadState !== "loading"}
+              onDecreaseCutCount={decreaseCutCount}
+              onIncreaseCutCount={increaseCutCount}
+              onSelectCut={selectCut}
+              selectedCutId={selectedCut?.id ?? ""}
+            />
+
+            <ProductionPanel
+              cutLoadState={cutLoadState}
+              exportSettings={studioPreferences.export}
+              exportState={exportState}
+              fullScenario={fullScenario}
+              generationState={generationState}
+              generationMessage={generationMessage}
+              imageGenerationAssets={imageGenerationAssets}
+              onBuildCardNewsInOnePass={buildCardNewsInOnePass}
+              onFlushSelectedCut={() => {
+                if (selectedCut) {
+                  flushPendingCutPatch(selectedCut.id);
+                }
+              }}
+              onGenerateSelectedCutImage={generateSelectedCutImage}
+              onFullScenarioChange={setFullScenario}
+              onUpdateSelectedCut={updateSelectedCut}
+              saveState={saveState}
+              selectedCut={selectedCut}
+              selectedProject={selectedProject}
+            />
+
+            <ImagePreviewPanel
+              canvasPreset={canvasPreset}
+              cut={selectedCut}
+              exportState={exportState}
+              canDownloadAllCutsZip={sortedCuts.length > 0}
+              onDownloadAllCutsZip={downloadAllCutsZip}
+              onDownloadCurrentCut={downloadCurrentCut}
+              project={selectedProject}
+            />
+          </div>
+        </div>
       </section>
 
       {projectCreateModalOpen ? (
@@ -1396,11 +1428,7 @@ function ProjectCreateModal({
 }
 
 type ProductionPanelProps = {
-  canIncreaseCutCount: boolean;
-  canvasPreset: CanvasPreset;
-  contentType: ContentType;
   cutLoadState: LoadState;
-  cuts: Cut[];
   exportSettings: StudioExportSettings;
   exportState: ExportState;
   fullScenario: string;
@@ -1408,25 +1436,17 @@ type ProductionPanelProps = {
   generationState: GenerationState;
   imageGenerationAssets: ImageGenerationAssets;
   onBuildCardNewsInOnePass: () => void;
-  onDecreaseCutCount: () => void;
   onFlushSelectedCut: () => void;
   onFullScenarioChange: (value: string) => void;
   onGenerateSelectedCutImage: () => void;
-  onIncreaseCutCount: () => void;
-  onSelectCut: (cutId: string) => void;
   onUpdateSelectedCut: (patch: UpdateCutInput) => void;
-  projectName: string;
   saveState: SaveState;
   selectedCut: Cut | null;
   selectedProject: Project | null;
 };
 
 function ProductionPanel({
-  canIncreaseCutCount,
-  canvasPreset,
-  contentType,
   cutLoadState,
-  cuts,
   exportSettings,
   exportState,
   fullScenario,
@@ -1434,14 +1454,10 @@ function ProductionPanel({
   generationState,
   imageGenerationAssets,
   onBuildCardNewsInOnePass,
-  onDecreaseCutCount,
   onFlushSelectedCut,
   onFullScenarioChange,
   onGenerateSelectedCutImage,
-  onIncreaseCutCount,
-  onSelectCut,
   onUpdateSelectedCut,
-  projectName,
   saveState,
   selectedCut,
   selectedProject,
@@ -1450,22 +1466,6 @@ function ProductionPanel({
 
   return (
     <div className="split-content production-panel">
-      <div className="panel-heading production-heading">
-        <div>
-          <p className="eyebrow">{labels.workbench}</p>
-          <h2>{projectName || labels.selectProject}</h2>
-          {selectedProject ? (
-            <span className="project-context-chips">
-              <StudioChip>{contentTypeLabels[contentType]}</StudioChip>
-              <StudioChip>{canvasPresetLabels[canvasPreset]}</StudioChip>
-            </span>
-          ) : (
-            <p>{labels.selectProjectHelp}</p>
-          )}
-        </div>
-        <span className={`save-badge ${saveState}`}>{getSaveLabel(saveState)}</span>
-      </div>
-
       {isCardNews ? (
         <section className="full-scenario-panel" aria-label={labels.fullScenario}>
           <label className="field-stack">
@@ -1488,17 +1488,7 @@ function ProductionPanel({
         </section>
       ) : null}
 
-      <section className="production-detail-grid" aria-label={labels.selectedProjectArea}>
-        <CutList
-          cutLoadState={cutLoadState}
-          cuts={cuts}
-          canIncreaseCutCount={canIncreaseCutCount}
-          onDecreaseCutCount={onDecreaseCutCount}
-          onIncreaseCutCount={onIncreaseCutCount}
-          onSelectCut={onSelectCut}
-          selectedCutId={selectedCut?.id ?? ""}
-        />
-
+      <section aria-label={labels.selectedProjectArea}>
         <CutEditor
           generationState={generationState}
           onGenerateSelectedCutImage={onGenerateSelectedCutImage}
