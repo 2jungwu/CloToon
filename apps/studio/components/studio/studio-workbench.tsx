@@ -1710,11 +1710,14 @@ function ImagePreviewPanel({
       </div>
 
       <div
+        aria-label={hasImage ? labels.imageOnlyPreviewTitle : labels.imagePreviewPlaceholder}
         className={`image-preview-canvas ${getCanvasRatioClass(canvasPreset)}`}
+        data-has-image={hasImage}
+        role="img"
         style={{ "--preview-image": cssImageUrl } as CSSProperties}
       >
         {hasImage ? <div className="image-preview-art" /> : null}
-        {!hasImage ? <p>{labels.imagePreviewPlaceholder}</p> : null}
+        {!hasImage ? <div className="image-preview-placeholder" aria-hidden="true" /> : null}
       </div>
 
       <div className="toolbar-row export-actions">
