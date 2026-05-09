@@ -1225,6 +1225,10 @@ textarea::placeholder {
   grid-template-columns: minmax(220px, 300px) minmax(0, 1fr);
 }
 
+.studio-workbench-layout {
+  grid-template-columns: minmax(220px, 280px) minmax(0, 1fr) minmax(280px, 360px);
+}
+
 .workspace-menu {
   display: grid;
   gap: 18px;
@@ -1485,6 +1489,57 @@ textarea::placeholder {
 
 .workspace-layout .preview-column .art-placeholder {
   border: 0;
+}
+
+.image-preview-panel {
+  align-content: start;
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+}
+
+.image-preview-panel .preview-toolbar h2 {
+  color: var(--app-text);
+  font-size: 24px;
+  font-weight: 800;
+  line-height: 1.25;
+  margin: 0;
+}
+
+.image-preview-canvas {
+  align-items: center;
+  background: #f1f1f4;
+  border: 1px solid var(--app-border);
+  border-radius: 8px;
+  color: #5f6368;
+  display: flex;
+  justify-content: center;
+  justify-self: center;
+  overflow: hidden;
+  position: relative;
+  text-align: center;
+  width: min(100%, 360px);
+}
+
+.image-preview-canvas p {
+  color: #5f6368;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.45;
+  margin: 0;
+  max-width: 76%;
+}
+
+.image-preview-art {
+  background-image: var(--preview-image);
+  background-position: center;
+  background-size: cover;
+  inset: 0;
+  position: absolute;
+}
+
+.image-preview-panel .export-actions {
+  justify-content: center;
 }
 
 .character-disclosure-list {

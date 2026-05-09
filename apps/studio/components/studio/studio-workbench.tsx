@@ -1,7 +1,9 @@
 "use client";
 
-import type { FormEvent, ReactNode } from "react";
+import type { CSSProperties, FormEvent, ReactNode } from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { toPng } from "html-to-image";
+import JSZip from "jszip";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -11,6 +13,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { toCssImageUrl } from "@/lib/cuts/image-data-url";
 import type { Cut, CutTemplate, UpdateCutInput } from "@/lib/cuts/types";
 import {
   loadGeminiApiKeyFromStorage,
@@ -18,7 +21,13 @@ import {
 } from "@/lib/image-generation/storage";
 import type { ImageGenerationAssets } from "@/lib/image-generation/types";
 import type { CanvasPreset, ContentType, Project } from "@/lib/projects/types";
-import type { StudioExportSettings } from "@/lib/studio-preferences";
+import {
+  defaultStudioPreferences,
+  getExportPixelRatio,
+  loadStudioPreferencesFromStorage,
+  type StudioExportSettings,
+  type StudioFonts,
+} from "@/lib/studio-preferences";
 
 type StudioWorkbenchProps = {
   initialProjectId?: string;
@@ -99,6 +108,15 @@ const labels = {
   assetSummary: "\uc774\ubbf8\uc9c0 \uc790\uc0b0",
   assetCountSuffix: "\uac1c",
   exportScale: "\ub0b4\ubcf4\ub0b4\uae30 \ubc30\uc728",
+  imageOnlyPreview: "\uc774\ubbf8\uc9c0 \ubbf8\ub9ac\ubcf4\uae30",
+  imageOnlyPreviewTitle: "\ucef7 \uc774\ubbf8\uc9c0",
+  imagePreviewPlaceholder: "\uc0dd\uc131\ub418\uac70\ub098 \uc5c5\ub85c\ub4dc\ub41c \uc774\ubbf8\uc9c0\uac00 \uc5c6\uc2b5\ub2c8\ub2e4.",
+  currentCutPng: "\ud604\uc7ac \ucef7 PNG",
+  allCutsZip: "\uc804\uccb4 ZIP",
+  exportDone: "\ub2e4\uc6b4\ub85c\ub4dc \uc0dd\uc131 \uc644\ub8cc",
+  exportFailed: "\ub2e4\uc6b4\ub85c\ub4dc \uc2e4\ud328",
+  exportCutNotFound: "\ub0b4\ubcf4\ub0bc \ucef7\uc744 \ucc3e\uc9c0 \ubabb\ud588\uc2b5\ub2c8\ub2e4.",
+  exportNoCuts: "\ub0b4\ubcf4\ub0bc \ucef7\uc774 \uc5c6\uc2b5\ub2c8\ub2e4.",
   noSelectedCut: "\uc120\ud0dd\ud55c \ucef7\uc774 \uc5c6\uc2b5\ub2c8\ub2e4.",
   comic: "\uc778\uc2a4\ud0c0\ud230",
   cardNews: "\uce74\ub4dc\ub274\uc2a4",
@@ -155,11 +173,6 @@ const emptyImageGenerationAssets: ImageGenerationAssets = {
   },
 };
 
-const defaultExportSettings: StudioExportSettings = {
-  exportScale: "1080",
-  saveOriginalHtml: true,
-};
-
 const cutTemplatesByContentType: Record<ContentType, CutTemplate> = {
   comic: "comic",
   "card-news": "card-news",
@@ -185,9 +198,10 @@ export function StudioWorkbench({ initialProjectId }: StudioWorkbenchProps) {
   const [saveState, setSaveState] = useState<SaveState>("idle");
   const [generationState, setGenerationState] = useState<GenerationState>("idle");
   const [generationMessage, setGenerationMessage] = useState("");
-  const [exportState] = useState<ExportState>("idle");
+  const [exportState, setExportState] = useState<ExportState>("idle");
   const [imageGenerationAssets] = useState<ImageGenerationAssets>(emptyImageGenerationAssets);
-  const [exportSettings] = useState<StudioExportSettings>(defaultExportSettings);
+  const [studioPreferences, setStudioPreferences] = useState(defaultStudioPreferences);
+  const exportRootRef = useRef<HTMLDivElement | null>(null);
   const cutRequestIdRef = useRef(0);
   const projectRequestIdRef = useRef(0);
   const projectsRef = useRef<Project[]>([]);
@@ -350,6 +364,7 @@ export function StudioWorkbench({ initialProjectId }: StudioWorkbenchProps) {
     () => cuts.find((cut) => cut.id === selectedCutId) ?? cuts[0] ?? null,
     [cuts, selectedCutId],
   );
+  const sortedCuts = useMemo(() => [...cuts].sort((a, b) => a.position - b.position), [cuts]);
 
   const loadCuts = useCallback(async (projectId: string) => {
     const requestId = cutRequestIdRef.current + 1;
@@ -459,6 +474,20 @@ export function StudioWorkbench({ initialProjectId }: StudioWorkbenchProps) {
       cancelled = true;
     };
   }, [loadProjects]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    window.queueMicrotask(() => {
+      if (!cancelled) {
+        setStudioPreferences(loadStudioPreferencesFromStorage(window.localStorage));
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     const patchTimers = patchTimersRef.current;
@@ -921,56 +950,176 @@ export function StudioWorkbench({ initialProjectId }: StudioWorkbenchProps) {
     }
   }
 
-  return (
-    <section className="split-layout workspace-layout" aria-label={labels.workbenchAria}>
-      <ProjectRail
-        canvasPreset={newCanvasPreset}
-        contentType={newContentType}
-        creatingProject={creatingProject}
-        deletingProjectId={deletingProjectId}
-        error={projectActionError}
-        name={newProjectName}
-        onCanvasPresetChange={setNewCanvasPreset}
-        onContentTypeChange={setNewContentType}
-        onCreateProject={createProject}
-        onDeleteProject={deleteProject}
-        onNameChange={setNewProjectName}
-        onProjectSelect={handleProjectSelect}
-        projectLoadState={projectLoadState}
-        projects={projects}
-        selectedProjectId={selectedProjectId}
-      />
+  async function flushCutsBeforeExport() {
+    await Promise.all(Object.keys(pendingCutPatchesRef.current).map((cutId) => flushPendingCutPatch(cutId)));
+  }
 
-      <ProductionPanel
-        canvasPreset={canvasPreset}
-        contentType={contentType}
-        cutLoadState={cutLoadState}
-        cuts={cuts}
-        canIncreaseCutCount={Boolean(selectedProject) && cutLoadState !== "loading"}
-        exportSettings={exportSettings}
-        exportState={exportState}
-        fullScenario={fullScenario}
-        generationState={generationState}
-        generationMessage={generationMessage}
-        imageGenerationAssets={imageGenerationAssets}
-        onBuildCardNewsInOnePass={buildCardNewsInOnePass}
-        onDecreaseCutCount={decreaseCutCount}
-        onFlushSelectedCut={() => {
-          if (selectedCut) {
-            flushPendingCutPatch(selectedCut.id);
-          }
-        }}
-        onGenerateSelectedCutImage={generateSelectedCutImage}
-        onFullScenarioChange={setFullScenario}
-        onIncreaseCutCount={increaseCutCount}
-        onSelectCut={selectCut}
-        onUpdateSelectedCut={updateSelectedCut}
-        projectName={projectName}
-        saveState={saveState}
-        selectedCut={selectedCut}
-        selectedProject={selectedProject}
-      />
-    </section>
+  async function downloadCurrentCut() {
+    if (!selectedProject || !selectedCut || !exportRootRef.current) {
+      return;
+    }
+
+    setExportState("exporting");
+
+    try {
+      await flushCutsBeforeExport();
+      const preferences = loadStudioPreferencesFromStorage(window.localStorage);
+      setStudioPreferences(preferences);
+      applyExportFontVariables(exportRootRef.current, preferences.fonts);
+      const node = exportRootRef.current.querySelector<HTMLElement>(
+        `[data-export-cut-id="${selectedCut.id}"]`,
+      );
+
+      if (!node) {
+        throw new Error(labels.exportCutNotFound);
+      }
+
+      const dataUrl = await toPng(node, {
+        cacheBust: true,
+        pixelRatio: getExportPixelRatio(preferences.export),
+        backgroundColor: "#ffffff",
+      });
+
+      downloadDataUrl(dataUrl, `${safeFileName(selectedProject.name)}-cut-${selectedCut.position}.png`);
+      setExportState("done");
+    } catch {
+      setExportState("error");
+    }
+  }
+
+  async function downloadAllCutsZip() {
+    if (!selectedProject || !exportRootRef.current) {
+      return;
+    }
+
+    setExportState("exporting");
+
+    try {
+      await flushCutsBeforeExport();
+      const preferences = loadStudioPreferencesFromStorage(window.localStorage);
+      setStudioPreferences(preferences);
+      applyExportFontVariables(exportRootRef.current, preferences.fonts);
+      const zip = new JSZip();
+      let pngCount = 0;
+
+      if (sortedCuts.length === 0) {
+        throw new Error(labels.exportNoCuts);
+      }
+
+      for (const cut of sortedCuts) {
+        const node = exportRootRef.current.querySelector<HTMLElement>(
+          `[data-export-cut-id="${cut.id}"]`,
+        );
+
+        if (!node) {
+          throw new Error(labels.exportCutNotFound);
+        }
+
+        const dataUrl = await toPng(node, {
+          cacheBust: true,
+          pixelRatio: getExportPixelRatio(preferences.export),
+          backgroundColor: "#ffffff",
+        });
+
+        zip.file(`cut-${String(cut.position).padStart(2, "0")}.png`, dataUrlToBlob(dataUrl));
+        pngCount += 1;
+
+        if (preferences.export.saveOriginalHtml) {
+          zip.file(
+            `cut-${String(cut.position).padStart(2, "0")}.html`,
+            createCutHtmlDocument(node, selectedProject, cut),
+          );
+        }
+      }
+
+      if (pngCount === 0) {
+        throw new Error(labels.exportNoCuts);
+      }
+
+      const blob = await zip.generateAsync({ type: "blob" });
+      downloadBlob(blob, `${safeFileName(selectedProject.name)}-cuts.zip`);
+      setExportState("done");
+    } catch {
+      setExportState("error");
+    }
+  }
+
+  return (
+    <>
+      <section className="split-layout workspace-layout studio-workbench-layout" aria-label={labels.workbenchAria}>
+        <ProjectRail
+          canvasPreset={newCanvasPreset}
+          contentType={newContentType}
+          creatingProject={creatingProject}
+          deletingProjectId={deletingProjectId}
+          error={projectActionError}
+          name={newProjectName}
+          onCanvasPresetChange={setNewCanvasPreset}
+          onContentTypeChange={setNewContentType}
+          onCreateProject={createProject}
+          onDeleteProject={deleteProject}
+          onNameChange={setNewProjectName}
+          onProjectSelect={handleProjectSelect}
+          projectLoadState={projectLoadState}
+          projects={projects}
+          selectedProjectId={selectedProjectId}
+        />
+
+        <ProductionPanel
+          canvasPreset={canvasPreset}
+          contentType={contentType}
+          cutLoadState={cutLoadState}
+          cuts={cuts}
+          canIncreaseCutCount={Boolean(selectedProject) && cutLoadState !== "loading"}
+          exportSettings={studioPreferences.export}
+          exportState={exportState}
+          fullScenario={fullScenario}
+          generationState={generationState}
+          generationMessage={generationMessage}
+          imageGenerationAssets={imageGenerationAssets}
+          onBuildCardNewsInOnePass={buildCardNewsInOnePass}
+          onDecreaseCutCount={decreaseCutCount}
+          onFlushSelectedCut={() => {
+            if (selectedCut) {
+              flushPendingCutPatch(selectedCut.id);
+            }
+          }}
+          onGenerateSelectedCutImage={generateSelectedCutImage}
+          onFullScenarioChange={setFullScenario}
+          onIncreaseCutCount={increaseCutCount}
+          onSelectCut={selectCut}
+          onUpdateSelectedCut={updateSelectedCut}
+          projectName={projectName}
+          saveState={saveState}
+          selectedCut={selectedCut}
+          selectedProject={selectedProject}
+        />
+
+        <ImagePreviewPanel
+          canvasPreset={canvasPreset}
+          cut={selectedCut}
+          exportState={exportState}
+          canDownloadAllCutsZip={sortedCuts.length > 0}
+          onDownloadAllCutsZip={downloadAllCutsZip}
+          onDownloadCurrentCut={downloadCurrentCut}
+          project={selectedProject}
+        />
+      </section>
+
+      {selectedProject ? (
+        <div className="export-stack" ref={exportRootRef} aria-hidden>
+          {sortedCuts.map((cut) => (
+            <CutExportCanvas
+              cut={cut}
+              exportId={cut.id}
+              fonts={studioPreferences.fonts}
+              key={cut.id}
+              project={selectedProject}
+            />
+          ))}
+        </div>
+      ) : null}
+    </>
   );
 }
 
@@ -1403,6 +1552,134 @@ function CutEditor({
   );
 }
 
+type ImagePreviewPanelProps = {
+  canDownloadAllCutsZip: boolean;
+  canvasPreset: CanvasPreset;
+  cut: Cut | null;
+  exportState: ExportState;
+  onDownloadAllCutsZip: () => void;
+  onDownloadCurrentCut: () => void;
+  project: Project | null;
+};
+
+function ImagePreviewPanel({
+  canDownloadAllCutsZip,
+  canvasPreset,
+  cut,
+  exportState,
+  onDownloadAllCutsZip,
+  onDownloadCurrentCut,
+  project,
+}: ImagePreviewPanelProps) {
+  const cssImageUrl = toCssImageUrl(cut?.imageDataUrl ?? "");
+  const hasImage =
+    cssImageUrl !== "none" && (cut?.imageStatus === "generated" || cut?.imageStatus === "uploaded");
+
+  return (
+    <aside className="image-preview-panel" aria-label={labels.imageOnlyPreview}>
+      <div className="preview-toolbar">
+        <div>
+          <p className="eyebrow">{labels.imageOnlyPreview}</p>
+          <h2>{labels.imageOnlyPreviewTitle}</h2>
+        </div>
+      </div>
+
+      <div
+        className={`image-preview-canvas ${getCanvasRatioClass(canvasPreset)}`}
+        style={{ "--preview-image": cssImageUrl } as CSSProperties}
+      >
+        {hasImage ? <div className="image-preview-art" /> : null}
+        {!hasImage ? <p>{labels.imagePreviewPlaceholder}</p> : null}
+      </div>
+
+      <div className="toolbar-row export-actions">
+        <Button
+          disabled={!project || !cut || exportState === "exporting"}
+          onClick={onDownloadCurrentCut}
+          type="button"
+        >
+          {labels.currentCutPng}
+        </Button>
+        <Button
+          disabled={!project || !canDownloadAllCutsZip || exportState === "exporting"}
+          onClick={onDownloadAllCutsZip}
+          type="button"
+          variant="secondary"
+        >
+          {labels.allCutsZip}
+        </Button>
+      </div>
+
+      <p className={`save-state save-state-${exportState}`}>
+        {exportState === "exporting" ? labels.exporting : null}
+        {exportState === "done" ? labels.exportDone : null}
+        {exportState === "error" ? labels.exportFailed : null}
+      </p>
+    </aside>
+  );
+}
+
+function CutExportCanvas({
+  cut,
+  exportId,
+  fonts,
+  project,
+}: {
+  cut: Cut;
+  exportId: string;
+  fonts: StudioFonts;
+  project: Project;
+}) {
+  const templateClass = cut.template === "card-news" ? "card-news" : "comic";
+  const cssImageUrl = toCssImageUrl(cut.imageDataUrl);
+  const hasImage = cssImageUrl !== "none";
+
+  return (
+    <article
+      className={`cut-canvas ${getCanvasRatioClass(project.canvasPreset)} ${templateClass}`}
+      data-export-cut-id={exportId}
+      style={
+        {
+          "--cut-image": cssImageUrl,
+          "--cut-caption-font": fonts.subtitle,
+          "--cut-dialogue-font": fonts.dialogue,
+        } as CSSProperties
+      }
+    >
+      <div className={hasImage ? "cut-art-layer has-image" : "cut-art-layer"}>
+        {!hasImage ? (
+          <div className="art-placeholder">
+            <span>{cut.imagePrompt || labels.imagePreviewPlaceholder}</span>
+          </div>
+        ) : null}
+      </div>
+      {cut.template === "card-news" ? (
+        <div className="card-copy">
+          {cut.caption ? <strong>{cut.caption}</strong> : null}
+          {cut.dialogue ? <p>{cut.dialogue}</p> : null}
+        </div>
+      ) : (
+        <>
+          {cut.dialogue ? <p className="speech-bubble">{cut.dialogue}</p> : null}
+          {cut.caption ? <p className="comic-caption">{cut.caption}</p> : null}
+        </>
+      )}
+    </article>
+  );
+}
+
+function getCanvasRatioClass(canvasPreset: CanvasPreset) {
+  if (canvasPreset === "9:16") {
+    return "canvas-9-16";
+  }
+
+  if (canvasPreset === "4:5") {
+    return "canvas-4-5";
+  }
+
+  return "canvas-1-1";
+}
+
 function getCutTitle(cut: Cut) {
   return cut.caption || cut.scenario || cut.dialogue || labels.noContent;
 }
@@ -1604,4 +1881,68 @@ function getStatusMessageClass(saveState: SaveState, generationStatus: Generatio
   }
 
   return saveState;
+}
+
+function applyExportFontVariables(root: HTMLElement | null, fonts: StudioFonts) {
+  root?.querySelectorAll<HTMLElement>(".cut-canvas").forEach((node) => {
+    node.style.setProperty("--cut-caption-font", fonts.subtitle);
+    node.style.setProperty("--cut-dialogue-font", fonts.dialogue);
+  });
+}
+
+function downloadDataUrl(dataUrl: string, fileName: string) {
+  const anchor = document.createElement("a");
+  anchor.href = dataUrl;
+  anchor.download = fileName;
+  anchor.click();
+}
+
+function downloadBlob(blob: Blob, fileName: string) {
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = fileName;
+  anchor.click();
+  window.setTimeout(() => URL.revokeObjectURL(url), 0);
+}
+
+function dataUrlToBlob(dataUrl: string) {
+  const [meta, base64] = dataUrl.split(",");
+  const mime = meta.match(/data:(.*?);/)?.[1] ?? "image/png";
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+
+  for (let index = 0; index < binary.length; index += 1) {
+    bytes[index] = binary.charCodeAt(index);
+  }
+
+  return new Blob([bytes], { type: mime });
+}
+
+function createCutHtmlDocument(node: HTMLElement, project: Project, cut: Cut) {
+  return [
+    "<!doctype html>",
+    '<html lang="ko">',
+    "<head>",
+    '<meta charset="utf-8" />',
+    '<meta name="viewport" content="width=device-width, initial-scale=1" />',
+    `<title>${escapeHtml(project.name)} - Cut ${cut.position}</title>`,
+    "</head>",
+    "<body>",
+    node.outerHTML,
+    "</body>",
+    "</html>",
+  ].join("\n");
+}
+
+function safeFileName(value: string) {
+  return value.replace(/[\\/:*?"<>|]/g, "-").trim() || "local-studio";
+}
+
+function escapeHtml(value: string) {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
 }
