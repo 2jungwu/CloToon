@@ -1,233 +1,248 @@
-# Studio Workbench Design
+# Studio Workbench 설계
 
-## Summary
+## 요약
 
-Projects and Workspace will be merged into a single Studio Workbench screen. The product should feel like a focused creation tool, not a set of separate setup pages. Users select or create a project on the left, edit the selected project and cut content in the center, and inspect generated image results on the right.
+`Projects`와 `Workspace`를 하나의 제작 화면인 `Studio Workbench`로 통합한다. 사용자는 왼쪽에서 프로젝트를 만들고 선택하며, 중앙에서 전체 카드뉴스 시나리오와 컷별 입력값을 편집하고, 오른쪽에서 생성 이미지 결과와 내보내기 액션을 확인한다.
 
-The approved visual direction is a Linear Studio-inspired interface: high contrast, restrained color, thin dividers, dense but readable tool layout, and blue primary actions. The UI should avoid card-heavy composition. Screen structure should be expressed through columns, rows, separators, active rows, chips, and form groups.
+시각 방향은 Linear Studio에서 영감을 받은 밝은 작업 도구 UI다. 카드형 박스를 반복해서 쌓지 않고, 얇은 구분선, 열 분할, 활성 행, chip, 명확한 폼 그룹으로 화면 구조를 만든다. primary 색상은 기존 시스템 블루 계열을 유지한다.
 
-## Approved Direction
+## 확정 방향
 
-- Use a single workbench layout for project selection, project creation, cut editing, and preview.
-- Keep three major columns on desktop:
-  - Left: project list and project creation.
-  - Center: selected project setup, full card-news scenario, cut list, and cut-specific fields.
-  - Right: generated image preview and export actions.
-- Do not move cut fields below the preview. Cut scenario, caption, dialogue, and image prompt stay in the center column.
-- The right preview column shows generated image output. Caption and dialogue are not shown as visible text in the v1 preview.
-- Dark mode is out of scope.
-- Genspark-style direct element selection/editing inside the preview is v2 scope only.
+- `/projects`와 `/workspace/[projectId]`는 같은 Workbench를 렌더링한다.
+- 데스크톱 기준 3열 구조를 사용한다.
+- 1열은 프로젝트 목록과 프로젝트 추가만 담당한다.
+- 2열은 선택 프로젝트의 제작 입력을 담당한다.
+- 3열은 생성 이미지 미리보기와 내보내기 액션을 담당한다.
+- 컷 시나리오, 자막, 대사, 이미지 프롬프트 입력은 중앙에 둔다.
+- `이미지 생성` 버튼은 중앙의 `이미지 프롬프트` 아래에 둔다.
+- 오른쪽 미리보기는 생성 이미지 결과 중심이다.
+- v1에서는 자막과 대사를 오른쪽 미리보기 텍스트 레이어로 노출하지 않는다.
+- 자막과 대사는 Gemini 이미지 생성 품질을 높이는 참고 입력값으로 사용한다.
+- 다크 모드는 고려하지 않는다.
+- Genspark처럼 미리보기 요소를 직접 선택해 편집하는 기능은 v2 범위로 넘긴다.
 
-## Layout
+## 화면 구조
 
-### Global Navigation
+### 상단 내비게이션
 
-The top nav should use `Studio` and `Assets`. `Studio` replaces the current split mental model of `Projects` and `Workspace`. Existing navigation labels can be adjusted during implementation, but `Assets` remains separate because it manages global local settings.
+상단 내비게이션은 `Studio`, `Assets`를 사용한다. `Studio`는 기존 `Projects`와 `Workspace`의 역할을 합친 진입점이다. URL 호환성을 위해 실제 href는 `/projects`를 유지할 수 있다.
 
-### Left Column: Projects
+### 1열: Projects
 
-The left column owns project discovery and project creation only.
+역할은 프로젝트 생성, 프로젝트 선택, 프로젝트 삭제다.
 
-Contents:
+포함 항목:
 
-- `Projects` heading.
-- New project form.
-- Project name input.
-- Separate dropdowns for content type and canvas preset.
-- Blue primary `프로젝트 추가` action.
-- Project list.
-- Each project row uses chips for content type, canvas preset, and cut count.
-- Project delete action appears on row hover.
+- `Projects` 제목
+- 새 프로젝트 이름 입력
+- 콘텐츠 유형 dropdown
+- 캔버스 dropdown
+- 블루 primary `프로젝트 추가` 버튼
+- 프로젝트 목록
+- 프로젝트 metadata chip
+- 프로젝트 행 hover 시 삭제 버튼
 
-Removed from this column:
+제거 항목:
 
-- Project search.
-- Cut controls.
-- Workspace-level forms.
-- Card-style project detail panels.
+- 프로젝트 검색
+- 컷 설정
+- 워크스페이스 상세 폼
+- 카드형 프로젝트 상세 패널
 
-### Center Column: Production Input
+프로젝트 목록 chip:
 
-The center column owns all writing and generation inputs.
+- 콘텐츠 유형: `인스타툰` 또는 `카드뉴스`
+- 캔버스: `1:1`, `4:5`, `9:16`
+- 필요 시 컷 수
 
-Top project setup area:
+### 2열: Production Input
 
-- Selected project name.
-- Content type, canvas preset, and cut count chips.
-- Project delete or secondary management action, if needed.
-- Full scenario area only for `card-news`.
-- The full scenario action label is `한 번에 제작`.
+역할은 전체 카드뉴스 제작 입력과 컷별 세부 입력이다.
 
-`한 번에 제작` behavior:
+상단 프로젝트 설정 영역:
 
-- Available only for card-news projects.
-- Uses the entered full scenario and configured cut count.
-- Calls Gemini through the local app flow to create the full card-news draft.
-- It should generate or update the cut structure and images for the card-news flow.
-- It must use the localStorage API key only at request time and must not persist the key to files, SQLite, logs, or git.
+- 선택 프로젝트 이름
+- 콘텐츠 유형 chip
+- 캔버스 chip
+- 컷 수 chip
+- 카드뉴스일 때만 `전체 시나리오`
+- 카드뉴스일 때만 `한 번에 제작`
 
-Lower center area:
+`한 번에 제작` 동작:
 
-- Split center content into cut list and cut editor.
-- Cut list includes cut count controls and cut rows.
-- Cut count controls show borderless `+` and `-` icon-only controls.
-- Cut rows show only the primary cut label, for example `#1 첫 장면`.
-- Remove secondary cut subtitles such as `생성 이미지`.
-- Cut editor includes:
-  - 컷 시나리오
-  - 자막
-  - 대사
-  - 이미지 프롬프트
-  - Blue primary `이미지 생성` below the image prompt.
+- 카드뉴스 프로젝트에서만 노출한다.
+- 사용자가 입력한 전체 시나리오와 현재 컷 수를 기준으로 동작한다.
+- Gemini API를 호출해 전체 카드뉴스 컷을 제작하는 사용자 명시 액션이다.
+- 자동 호출, 페이지 진입 시 호출, 프로젝트 선택 시 호출은 금지한다.
+- 여러 컷 이미지를 만들 때는 API 호출 폭증을 막기 위해 순차 호출한다.
+- API key는 요청 중에만 사용하고 파일, DB, 로그, git에 저장하지 않는다.
 
-`이미지 생성` behavior:
+하단 컷 작업 영역:
 
-- Generates only the selected/current cut image.
-- Uses character and background assets, cut scenario, caption, dialogue, and image prompt.
-- Caption and dialogue are context for generation quality, not text to draw inside the generated image.
-- The generated image appears in the right preview column.
+- 중앙 내부를 다시 컷 목록과 컷 편집 폼으로 나눈다.
+- 컷 목록에는 컷 수 조절과 컷 행만 둔다.
+- 컷 수 `+`, `-`는 border 없는 아이콘형 컨트롤로 표시한다.
+- 컷 행은 `#1 첫 장면`처럼 주 정보만 표시한다.
+- 컷 행에서 `생성 이미지`, `Mock 이미지`, `이미지 없음` 같은 부제목은 제거한다.
 
-### Right Column: Preview
+컷 편집 필드:
 
-The right column owns visual output and export.
+- 컷 시나리오
+- 자막
+- 대사
+- 이미지 프롬프트
+- 이미지 프롬프트 아래 블루 primary `이미지 생성`
 
-Contents:
+`이미지 생성` 동작:
 
-- `Preview` heading.
-- Generated image preview canvas.
-- Placeholder state with gray placeholder text.
-- Export actions:
-  - `현재 컷 PNG`
-  - `전체 ZIP`
+- 현재 선택 컷만 생성한다.
+- Assets의 캐릭터/배경 설정, 컷 시나리오, 자막, 대사, 이미지 프롬프트를 조합한다.
+- 자막과 대사는 이미지 안에 글자로 그리라는 지시가 아니라 장면 이해를 위한 참고값이다.
+- 생성 결과는 오른쪽 preview에 표시한다.
 
-The preview should not show caption/dialogue text as a visible layer in v1. This is a change from the earlier HTML text-layer preview direction. In this design, caption and dialogue are generation references and editing fields. Direct editable text overlay is reserved for v2.
+### 3열: Preview
 
-## Visual Style
+역할은 생성 이미지 결과 확인과 내보내기다.
 
-Theme: Linear Studio-inspired.
+포함 항목:
 
-Rules:
+- `Preview` 제목
+- 생성 이미지 표시 영역
+- 회색 placeholder
+- `현재 컷 PNG`
+- `전체 ZIP`
 
-- Use white and near-white surfaces.
-- Use thin neutral borders for layout separation.
-- Use high-contrast text for labels and active information.
-- Keep primary actions blue.
-- Use blue for primary CTA, active nav state, focus, and key accents.
-- Use chips for compact project metadata.
-- Avoid card-heavy page composition.
-- Avoid decorative gradients, color strips, and large shadows.
-- Placeholders should use a clear gray tone, not low-contrast pale text.
-- Maintain strong contrast between labels, input text, placeholder text, dividers, and active rows.
+v1의 오른쪽 preview는 생성 이미지 결과를 보여주는 영역이다. 자막과 대사 텍스트 레이어는 보여주지 않는다. 기존 export 결과에서 HTML/CSS 레이어를 유지할지 여부는 구현 중 기존 export 호환성을 기준으로 판단한다.
 
-## Routing
+## 시각 스타일
 
-Recommended route behavior:
+테마는 Linear Studio 계열이다.
 
-- `/projects` becomes the Studio Workbench entry point.
-- `/projects` with no selected project shows the project creation state and/or first available project.
-- `/workspace/[projectId]` remains for compatibility and opens the same workbench with that project selected.
-- `/assets` remains the global assets/settings screen.
-- `/settings` continues redirecting to `/assets?section=api-key`.
+규칙:
 
-## Data And Compatibility
+- 배경은 흰색과 near-white를 사용한다.
+- 화면 구조는 얇은 중립 border로 나눈다.
+- primary action은 블루 계열을 유지한다.
+- active state, focus, 주요 CTA에만 블루를 쓴다.
+- metadata는 chip으로 표시한다.
+- 카드형 UI 반복을 피한다.
+- 장식용 gradient, 컬러 strip, 큰 그림자는 쓰지 않는다.
+- placeholder는 충분히 읽히는 회색으로 조정한다.
+- label, 입력값, placeholder, divider, active row의 대비를 명확히 한다.
 
-This redesign should not require DB schema changes.
+## 라우팅
 
-Keep:
+- `/projects`: Studio Workbench 기본 진입점
+- `/workspace/[projectId]`: 기존 북마크 호환용 deep link. 같은 Workbench를 열고 해당 프로젝트를 선택한다.
+- `/assets`: 전역 Assets/Settings 화면 유지
+- `/settings`: 기존대로 `/assets?section=api-key`로 redirect
 
-- Existing `Project` shape.
-- Existing `Cut` shape.
-- Existing project and cut APIs unless implementation discovers a necessary local route for batch card-news generation.
-- Existing localStorage keys for assets and settings.
-- Existing PNG/ZIP export structure.
+## 데이터와 호환성
 
-Changes are primarily UI composition and orchestration.
+이번 개편은 UI composition과 orchestration 중심이다.
 
-## V1 Scope
+유지:
 
-Included:
+- 기존 `Project` 타입
+- 기존 `Cut` 타입
+- 기존 SQLite schema
+- 기존 프로젝트/컷 API
+- 기존 `local-studio-assets`
+- 기존 `local-studio-settings`
+- 기존 PNG/ZIP export 구조
 
-- Single Studio Workbench layout.
-- Linear Studio visual treatment.
-- Left project creation/list area.
-- Center card-news full scenario and cut editor.
-- Right generated image preview and export area.
-- Card-news-only `전체 시나리오` and `한 번에 제작`.
-- Current-cut `이미지 생성` below `이미지 프롬프트`.
-- Project chips.
-- Hover delete action for project rows.
-- Borderless cut count plus/minus controls.
-- Preview focused on generated images.
+필요 시 추가 가능한 것:
 
-Excluded:
+- `한 번에 제작`을 더 정교하게 만들기 위한 batch orchestration helper
+- 단, API key 저장 정책과 local-first 원칙은 바꾸지 않는다.
 
-- Direct in-preview element selection.
-- Rich text toolbar.
-- Drag handles around preview elements.
-- Dark mode.
-- Cloud sync or remote persistence.
-- API key storage outside browser localStorage.
+## v1 범위
 
-## V2 Notes
+포함:
 
-Genspark-style advanced editing is a future feature. In v2, users may select text or visual elements directly inside the preview and edit them with a floating toolbar. That will require a separate interaction model, selection state, and likely a more explicit document/layer representation. It should not be mixed into the v1 workbench refactor.
+- 단일 Studio Workbench 화면
+- Linear Studio 스타일
+- 프로젝트 생성/목록/삭제 hover
+- 프로젝트 metadata chip
+- 카드뉴스 전용 `전체 시나리오`
+- 카드뉴스 전용 `한 번에 제작`
+- 컷 수 borderless icon stepper
+- 컷 목록 부제목 제거
+- 중앙 컷별 입력 폼
+- 중앙 `이미지 생성`
+- 오른쪽 image-only preview
+- PNG/ZIP export 액션
+- `/workspace/[projectId]` deep link 호환
 
-## Responsive Behavior
+제외:
 
-Desktop:
+- preview 요소 직접 선택 편집
+- rich text toolbar
+- preview 안 drag handle
+- 다크 모드
+- 클라우드 동기화
+- API key 외부 저장
 
-- Three columns: Projects, Production Input, Preview.
-- Center column can internally split into cut list and cut editor.
+## v2 메모
 
-Tablet:
+Genspark식 고급 편집은 v2에서 다룬다. v2에서는 preview 안의 텍스트나 이미지 요소를 선택하고 floating toolbar로 편집할 수 있다. 이 기능은 별도의 layer/document model과 selection state가 필요하므로 v1 Workbench refactor와 섞지 않는다.
 
-- Projects and Production Input can remain side by side.
-- Preview may move below or become a sticky panel depending on available width.
+## 반응형
 
-Mobile:
+데스크톱:
 
-- Use stacked sections or tabbed panes.
-- Keep the same mental model: Projects, Cuts/Input, Preview.
-- Avoid horizontal overflow.
-- Form controls and action buttons must keep readable text and accessible tap targets.
+- 3열: Projects, Production Input, Preview
+- 중앙 열 내부는 컷 목록과 컷 편집 폼으로 재분할
 
-## Acceptance Criteria
+태블릿:
 
-- Users can create a project from the left column.
-- Users can select existing projects from the left column.
-- Project rows show metadata through chips.
-- Hovering a project row reveals a delete control on desktop.
-- Card-news projects show the full scenario input and `한 번에 제작`.
-- Comic projects do not show the full scenario batch area.
-- Cut count controls use borderless icon-only plus/minus controls.
-- Cut rows do not show secondary image status subtitles.
-- Cut scenario, caption, dialogue, and image prompt are edited in the center column.
-- The selected cut image is generated through the center `이미지 생성` button.
-- The preview column shows generated image output, not caption/dialogue text layers.
-- Export actions remain available from the preview column.
-- The UI uses Linear Studio-like contrast, separators, chips, and blue primary actions.
-- Existing project data, cut data, assets, settings, and export formats remain compatible.
+- Projects와 Production Input은 가능한 한 유지
+- Preview는 아래로 내려가거나 별도 섹션으로 접힌다.
 
-## Verification Plan
+모바일:
 
-Static verification:
+- 세 영역을 세로로 쌓는다.
+- 같은 mental model을 유지한다: Projects, Cuts/Input, Preview.
+- 가로 overflow와 텍스트 겹침이 없어야 한다.
+
+## 수용 기준
+
+- 왼쪽 열에서 프로젝트를 생성할 수 있다.
+- 왼쪽 열에서 프로젝트를 선택할 수 있다.
+- 프로젝트 행에는 chip metadata가 보인다.
+- 프로젝트 행 hover 시 삭제 버튼이 보인다.
+- 카드뉴스 프로젝트에는 `전체 시나리오`와 `한 번에 제작`이 보인다.
+- 인스타툰 프로젝트에는 `전체 시나리오` batch 영역이 보이지 않는다.
+- 컷 수 컨트롤은 border 없는 `+`, `-` 아이콘형이다.
+- 컷 행에는 이미지 상태 부제목이 보이지 않는다.
+- 컷 시나리오, 자막, 대사, 이미지 프롬프트는 중앙에서 편집한다.
+- 현재 컷 이미지는 중앙의 `이미지 생성` 버튼으로 생성한다.
+- 오른쪽 preview는 자막/대사 텍스트 레이어가 아니라 생성 이미지 결과를 보여준다.
+- export 액션은 오른쪽 preview 열에서 사용할 수 있다.
+- 기존 프로젝트/컷/Assets/Settings/export 데이터와 호환된다.
+
+## 검증 계획
+
+정적 검증:
 
 - `npm run typecheck`
 - `npm run lint`
 - `npm run build`
 
-Browser verification:
+브라우저 검증:
 
 - `/projects`
-- `/workspace/[projectId]` compatibility route
+- `/workspace/[projectId]`
 - `/assets`
-- Card-news project flow: full scenario, cut count, `한 번에 제작`.
-- Comic project flow: no full scenario batch area.
-- Current-cut flow: edit fields, click `이미지 생성`, verify preview updates.
-- Export flow: current cut PNG and full ZIP.
+- 카드뉴스 프로젝트에서 전체 시나리오, 컷 수, `한 번에 제작`
+- 인스타툰 프로젝트에서 전체 시나리오 batch 영역 미노출
+- 현재 컷에서 필드 수정 후 `이미지 생성`
+- preview 업데이트 확인
+- 현재 컷 PNG
+- 전체 ZIP
 
-Responsive verification:
+반응형 검증:
 
-- Desktop workbench has no overlapping columns or clipped controls.
-- Tablet/mobile layouts do not overflow horizontally.
-- Project chips and icon-only cut controls remain readable and tappable.
+- 데스크톱에서 열 겹침 없음
+- 모바일에서 가로 overflow 없음
+- 프로젝트 chip, icon-only cut control, 긴 한국어 텍스트가 겹치지 않음
