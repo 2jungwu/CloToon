@@ -11,7 +11,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import type { Cut, CutImageStatus } from "@/lib/cuts/types";
+import type { Cut, CutTemplate, UpdateCutInput } from "@/lib/cuts/types";
 import type { ImageGenerationAssets } from "@/lib/image-generation/types";
 import type { CanvasPreset, ContentType, Project } from "@/lib/projects/types";
 import type { StudioExportSettings } from "@/lib/studio-preferences";
@@ -37,6 +37,10 @@ type CutsResponse = {
   cuts: Cut[];
 };
 
+type CutResponse = {
+  cut: Cut;
+};
+
 const labels = {
   studio: "\uc2a4\ud29c\ub514\uc624",
   workbench: "\uc6cc\ud06c\ubca4\uce58",
@@ -60,12 +64,18 @@ const labels = {
   status: "\uc0c1\ud0dc",
   noContent: "\ub0b4\uc6a9 \uc5c6\uc74c",
   selectedCut: "\uc120\ud0dd\ud55c \ucef7",
+  cutScenario: "\ucef7 \uc2dc\ub098\ub9ac\uc624",
+  cutScenarioPlaceholder: "\uc774 \ucef7\uc5d0\uc11c \ubcf4\uc5ec\uc904 \uc7a5\uba74\uc744 \uc801\uc5b4\uc8fc\uc138\uc694.",
   fullScenario: "\uc804\uccb4 \uc2dc\ub098\ub9ac\uc624",
   fullScenarioPlaceholder:
-    "\ub2e4\uc74c \uc791\uc5c5\uc5d0\uc11c \uc804\uccb4 \uc2dc\ub098\ub9ac\uc624 \ud3b8\uc9d1 \uc601\uc5ed\uc774 \uc5f0\uacb0\ub429\ub2c8\ub2e4.",
+    "\uce74\ub4dc\ub274\uc2a4 \uc804\uccb4 \ud750\ub984\uc744 \uc801\uc5b4\uc8fc\uc138\uc694.",
+  produceAll: "\ud55c \ubc88\uc5d0 \uc81c\uc791",
   caption: "\uc790\ub9c9",
+  captionPlaceholder: "\ud654\uba74\uc5d0 \ud45c\uc2dc\ud560 \uc790\ub9c9\uc744 \uc785\ub825\ud558\uc138\uc694.",
   dialogue: "\ub300\uc0ac",
+  dialoguePlaceholder: "\ub300\uc0ac \ub610\ub294 \ubcf8\ubb38\uc744 \uc785\ub825\ud558\uc138\uc694.",
   imagePrompt: "\uc774\ubbf8\uc9c0 \ud504\ub86c\ud504\ud2b8",
+  imagePromptPlaceholder: "\uc774\ubbf8\uc9c0\ub85c \ub9cc\ub4e4 \uc7a5\uba74\uc744 \uc124\uba85\ud558\uc138\uc694.",
   none: "\uc5c6\uc74c",
   generation: "\uc0dd\uc131",
   export: "\ub0b4\ubcf4\ub0b4\uae30",
@@ -103,14 +113,6 @@ const canvasPresetLabels: Record<CanvasPreset, string> = {
   "9:16": "9:16",
 };
 
-const cutImageStatusLabels: Record<CutImageStatus, string> = {
-  empty: "\uc774\ubbf8\uc9c0 \uc5c6\uc74c",
-  mock: "\ubaa9\uc5c5 \uc774\ubbf8\uc9c0",
-  uploaded: "\uc5c5\ub85c\ub4dc \uc774\ubbf8\uc9c0",
-  generated: "\uc0dd\uc131 \uc774\ubbf8\uc9c0",
-  failed: "\uc0dd\uc131 \uc2e4\ud328",
-};
-
 const emptyImageGenerationAssets: ImageGenerationAssets = {
   selectedCharacterId: "",
   characters: [],
@@ -124,6 +126,11 @@ const emptyImageGenerationAssets: ImageGenerationAssets = {
 const defaultExportSettings: StudioExportSettings = {
   exportScale: "1080",
   saveOriginalHtml: true,
+};
+
+const cutTemplatesByContentType: Record<ContentType, CutTemplate> = {
+  comic: "comic",
+  "card-news": "card-news",
 };
 
 export function StudioWorkbench({ initialProjectId }: StudioWorkbenchProps) {
@@ -143,7 +150,7 @@ export function StudioWorkbench({ initialProjectId }: StudioWorkbenchProps) {
   const [fullScenario, setFullScenario] = useState("");
   const [projectLoadState, setProjectLoadState] = useState<LoadState>("idle");
   const [cutLoadState, setCutLoadState] = useState<LoadState>("idle");
-  const [saveState] = useState<SaveState>("idle");
+  const [saveState, setSaveState] = useState<SaveState>("idle");
   const [generationState] = useState<GenerationState>("idle");
   const [exportState] = useState<ExportState>("idle");
   const [imageGenerationAssets] = useState<ImageGenerationAssets>(emptyImageGenerationAssets);
@@ -152,6 +159,108 @@ export function StudioWorkbench({ initialProjectId }: StudioWorkbenchProps) {
   const projectRequestIdRef = useRef(0);
   const projectsRef = useRef<Project[]>([]);
   const selectedProjectIdRef = useRef(initialProjectId ?? "");
+  const selectedCutIdRef = useRef("");
+  const pendingCutPatchesRef = useRef<Record<string, UpdateCutInput>>({});
+  const pendingCutProjectIdsRef = useRef<Record<string, string>>({});
+  const patchTimersRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+  const cutPatchChainsRef = useRef<Record<string, Promise<void>>>({});
+
+  const patchCut = useCallback(
+    async (cutId: string, patch: UpdateCutInput, projectId = selectedProjectIdRef.current) => {
+      if (!projectId) {
+        return;
+      }
+
+      const currentChain = cutPatchChainsRef.current[cutId] ?? Promise.resolve();
+
+      const nextChain = currentChain
+        .catch(() => undefined)
+        .then(async () => {
+          setSaveState("saving");
+
+          try {
+            const response = await fetch(`/api/projects/${projectId}/cuts/${cutId}`, {
+              method: "PATCH",
+              headers: {
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify(patch),
+            });
+
+            if (!response.ok) {
+              throw new Error("Unable to update cut.");
+            }
+
+            await response.json();
+
+            if (selectedProjectIdRef.current === projectId) {
+              setSaveState("saved");
+            }
+          } catch {
+            if (selectedProjectIdRef.current === projectId) {
+              setSaveState("error");
+            }
+          }
+        })
+        .finally(() => {
+          if (cutPatchChainsRef.current[cutId] === nextChain) {
+            delete cutPatchChainsRef.current[cutId];
+          }
+        });
+
+      cutPatchChainsRef.current[cutId] = nextChain;
+    },
+    [],
+  );
+
+  const flushPendingCutPatch = useCallback(
+    (cutId: string) => {
+      const timer = patchTimersRef.current[cutId];
+
+      if (timer) {
+        clearTimeout(timer);
+      }
+
+      const pendingPatch = pendingCutPatchesRef.current[cutId];
+      const projectId = pendingCutProjectIdsRef.current[cutId] ?? selectedProjectIdRef.current;
+
+      delete patchTimersRef.current[cutId];
+      delete pendingCutPatchesRef.current[cutId];
+      delete pendingCutProjectIdsRef.current[cutId];
+
+      if (!pendingPatch) {
+        return;
+      }
+
+      void patchCut(cutId, pendingPatch, projectId);
+    },
+    [patchCut],
+  );
+
+  const flushAllPendingCutPatches = useCallback(() => {
+    Object.keys(pendingCutPatchesRef.current).forEach((cutId) => flushPendingCutPatch(cutId));
+  }, [flushPendingCutPatch]);
+
+  const clearPendingCutPatch = useCallback((cutId: string) => {
+    const timer = patchTimersRef.current[cutId];
+
+    if (timer) {
+      clearTimeout(timer);
+    }
+
+    delete patchTimersRef.current[cutId];
+    delete pendingCutPatchesRef.current[cutId];
+    delete pendingCutProjectIdsRef.current[cutId];
+  }, []);
+
+  const selectCut = useCallback((cutId: string) => {
+    if (selectedCutIdRef.current && selectedCutIdRef.current !== cutId) {
+      flushPendingCutPatch(selectedCutIdRef.current);
+    }
+
+    selectedCutIdRef.current = cutId;
+    setSelectedCutId(cutId);
+  }, [flushPendingCutPatch]);
 
   const selectedProject = useMemo(
     () => projects.find((project) => project.id === selectedProjectId) ?? null,
@@ -182,13 +291,11 @@ export function StudioWorkbench({ initialProjectId }: StudioWorkbenchProps) {
       }
 
       setCuts(loadedCuts);
-      setSelectedCutId((currentCutId) => {
-        if (loadedCuts.some((cut) => cut.id === currentCutId)) {
-          return currentCutId;
-        }
-
-        return loadedCuts[0]?.id ?? "";
-      });
+      selectCut(
+        loadedCuts.some((cut) => cut.id === selectedCutIdRef.current)
+          ? selectedCutIdRef.current
+          : (loadedCuts[0]?.id ?? ""),
+      );
       setCutLoadState("ready");
     } catch {
       if (requestId !== cutRequestIdRef.current || selectedProjectIdRef.current !== projectId) {
@@ -196,10 +303,10 @@ export function StudioWorkbench({ initialProjectId }: StudioWorkbenchProps) {
       }
 
       setCuts([]);
-      setSelectedCutId("");
+      selectCut("");
       setCutLoadState("error");
     }
-  }, []);
+  }, [selectCut]);
 
   const loadProjects = useCallback(async () => {
     const requestId = projectRequestIdRef.current + 1;
@@ -236,12 +343,12 @@ export function StudioWorkbench({ initialProjectId }: StudioWorkbenchProps) {
 
       if (preferredProject) {
         setCuts([]);
-        setSelectedCutId("");
+        selectCut("");
         await loadCuts(preferredProject.id);
       } else {
         cutRequestIdRef.current += 1;
         setCuts([]);
-        setSelectedCutId("");
+        selectCut("");
       }
     } catch {
       if (requestId !== projectRequestIdRef.current) {
@@ -254,10 +361,10 @@ export function StudioWorkbench({ initialProjectId }: StudioWorkbenchProps) {
       selectedProjectIdRef.current = "";
       cutRequestIdRef.current += 1;
       setCuts([]);
-      setSelectedCutId("");
+      selectCut("");
       setProjectLoadState("error");
     }
-  }, [initialProjectId, loadCuts]);
+  }, [initialProjectId, loadCuts, selectCut]);
 
   useEffect(() => {
     let cancelled = false;
@@ -273,6 +380,15 @@ export function StudioWorkbench({ initialProjectId }: StudioWorkbenchProps) {
     };
   }, [loadProjects]);
 
+  useEffect(() => {
+    const patchTimers = patchTimersRef.current;
+
+    return () => {
+      flushAllPendingCutPatches();
+      Object.values(patchTimers).forEach((timer) => clearTimeout(timer));
+    };
+  }, [flushAllPendingCutPatches]);
+
   function setProjectDetails(project: Project | null) {
     if (!project) {
       setProjectName("");
@@ -287,23 +403,25 @@ export function StudioWorkbench({ initialProjectId }: StudioWorkbenchProps) {
   }
 
   function clearSelectedProject() {
+    flushAllPendingCutPatches();
     setSelectedProjectId("");
     selectedProjectIdRef.current = "";
     setProjectDetails(null);
     cutRequestIdRef.current += 1;
     setCuts([]);
-    setSelectedCutId("");
+    selectCut("");
     setCutLoadState("idle");
   }
 
   function selectProject(project: Project) {
+    flushAllPendingCutPatches();
     projectRequestIdRef.current += 1;
     setSelectedProjectId(project.id);
     selectedProjectIdRef.current = project.id;
     setProjectDetails(project);
     setProjectLoadState("ready");
     setCuts([]);
-    setSelectedCutId("");
+    selectCut("");
     void loadCuts(project.id);
   }
 
@@ -412,6 +530,143 @@ export function StudioWorkbench({ initialProjectId }: StudioWorkbenchProps) {
     }
   }
 
+  async function createCut() {
+    const projectId = selectedProjectIdRef.current;
+    const project = projectsRef.current.find((item) => item.id === projectId) ?? null;
+
+    if (!project) {
+      return;
+    }
+
+    setSaveState("saving");
+
+    try {
+      const response = await fetch(`/api/projects/${projectId}/cuts`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          template: cutTemplatesByContentType[project.contentType],
+          scenario: "",
+          caption: "",
+          dialogue: "",
+          imagePrompt: "",
+          negativePrompt: "",
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Unable to create cut.");
+      }
+
+      const payload = (await response.json()) as CutResponse;
+
+      if (selectedProjectIdRef.current !== projectId) {
+        return;
+      }
+
+      setCuts((currentCuts) => [...currentCuts, payload.cut]);
+      selectCut(payload.cut.id);
+      setCutLoadState("ready");
+      setSaveState("saved");
+    } catch {
+      if (selectedProjectIdRef.current === projectId) {
+        setSaveState("error");
+      }
+    }
+  }
+
+  async function deleteCut(cutId: string) {
+    const projectId = selectedProjectIdRef.current;
+
+    if (!projectId) {
+      return;
+    }
+
+    setSaveState("saving");
+
+    try {
+      const response = await fetch(`/api/projects/${projectId}/cuts/${cutId}`, {
+        method: "DELETE",
+      });
+
+      if (!response.ok) {
+        throw new Error("Unable to delete cut.");
+      }
+
+      if (selectedProjectIdRef.current !== projectId) {
+        return;
+      }
+
+      setCuts((currentCuts) => {
+        const deletedIndex = currentCuts.findIndex((cut) => cut.id === cutId);
+        const remainingCuts = currentCuts.filter((cut) => cut.id !== cutId);
+
+        clearPendingCutPatch(cutId);
+
+        if (selectedCutIdRef.current === cutId) {
+          const nextSelectedCut = remainingCuts[deletedIndex] ?? remainingCuts[deletedIndex - 1] ?? null;
+          selectCut(nextSelectedCut?.id ?? "");
+        }
+
+        return remainingCuts;
+      });
+      setSaveState("saved");
+    } catch {
+      if (selectedProjectIdRef.current === projectId) {
+        setSaveState("error");
+      }
+    }
+  }
+
+  function updateSelectedCut(patch: UpdateCutInput) {
+    if (!selectedCut) {
+      return;
+    }
+
+    const cutId = selectedCut.id;
+    const projectId = selectedProjectIdRef.current;
+
+    setCuts((currentCuts) =>
+      currentCuts.map((cut) => (cut.id === cutId ? { ...cut, ...patch } : cut)),
+    );
+
+    pendingCutPatchesRef.current[cutId] = {
+      ...pendingCutPatchesRef.current[cutId],
+      ...patch,
+    };
+    pendingCutProjectIdsRef.current[cutId] = projectId;
+
+    const currentTimer = patchTimersRef.current[cutId];
+
+    if (currentTimer) {
+      clearTimeout(currentTimer);
+    }
+
+    patchTimersRef.current[cutId] = setTimeout(() => {
+      flushPendingCutPatch(cutId);
+    }, 350);
+  }
+
+  function increaseCutCount() {
+    if (!selectedProject || cutLoadState === "loading") {
+      return;
+    }
+
+    void createCut();
+  }
+
+  function decreaseCutCount() {
+    const lastCut = cuts.at(-1);
+
+    if (!lastCut) {
+      return;
+    }
+
+    void deleteCut(lastCut.id);
+  }
+
   return (
     <section className="split-layout workspace-layout" aria-label={labels.workbenchAria}>
       <ProjectRail
@@ -432,110 +687,32 @@ export function StudioWorkbench({ initialProjectId }: StudioWorkbenchProps) {
         selectedProjectId={selectedProjectId}
       />
 
-      <div className="split-content">
-        <div className="panel-heading">
-          <div>
-            <p className="eyebrow">Workbench</p>
-            <h2>{projectName || labels.selectProject}</h2>
-            <p>
-              {selectedProject
-                ? `${contentTypeLabels[contentType]} - ${canvasPreset}`
-                : labels.selectProjectHelp}
-            </p>
-          </div>
-          <span className="save-badge">{getSaveLabel(saveState)}</span>
-        </div>
-
-        <section className="workspace-detail-grid" aria-label={labels.selectedProjectArea}>
-          <aside className="split-menu workspace-menu" aria-label={labels.cutList}>
-            <div className="storyboard-info">
-              <p className="eyebrow">Cuts</p>
-              <dl>
-                <div>
-                  <dt>{labels.cutCount}</dt>
-                  <dd>{cuts.length}</dd>
-                </div>
-                <div>
-                  <dt>{labels.status}</dt>
-                  <dd>{getCutLoadMessage(cutLoadState)}</dd>
-                </div>
-              </dl>
-            </div>
-
-            <div className="split-menu-list cut-list">
-              {cuts.map((cut) => {
-                const active = cut.id === selectedCut?.id;
-
-                return (
-                  <button
-                    aria-current={active ? "page" : undefined}
-                    className="split-menu-item workspace-cut-item"
-                    data-active={active}
-                    key={cut.id}
-                    onClick={() => setSelectedCutId(cut.id)}
-                    type="button"
-                  >
-                    <span>#{cut.position}</span>
-                    <strong>{cut.caption || cut.dialogue || labels.noContent}</strong>
-                    <small>{cutImageStatusLabels[cut.imageStatus]}</small>
-                  </button>
-                );
-              })}
-            </div>
-          </aside>
-
-          <div className="editor-panel">
-            {selectedCut ? (
-              <>
-                <div className="panel-heading inline-heading">
-                  <div>
-                    <p className="eyebrow">Cut {selectedCut.position}</p>
-                    <h2>{selectedCut.caption || labels.selectedCut}</h2>
-                  </div>
-                </div>
-
-                <label className="field-stack">
-                  {labels.fullScenario}
-                  <textarea
-                    onChange={(event) => setFullScenario(event.target.value)}
-                    placeholder={labels.fullScenarioPlaceholder}
-                    rows={5}
-                    value={fullScenario}
-                  />
-                </label>
-
-                <div className="storyboard-info">
-                  <dl>
-                    <div>
-                      <dt>{labels.caption}</dt>
-                      <dd>{selectedCut.caption || labels.none}</dd>
-                    </div>
-                    <div>
-                      <dt>{labels.dialogue}</dt>
-                      <dd>{selectedCut.dialogue || labels.none}</dd>
-                    </div>
-                    <div>
-                      <dt>{labels.imagePrompt}</dt>
-                      <dd>{selectedCut.imagePrompt || labels.none}</dd>
-                    </div>
-                  </dl>
-                </div>
-
-                <p className="save-state">
-                  {labels.generation}: {getGenerationLabel(generationState)} - {labels.export}:{" "}
-                  {getExportLabel(exportState)}
-                </p>
-                <p className="sr-only">
-                  {labels.assetSummary} {imageGenerationAssets.characters.length}
-                  {labels.assetCountSuffix}, {labels.exportScale} {exportSettings.exportScale}
-                </p>
-              </>
-            ) : (
-              <p className="empty-state">{labels.noSelectedCut}</p>
-            )}
-          </div>
-        </section>
-      </div>
+      <ProductionPanel
+        canvasPreset={canvasPreset}
+        contentType={contentType}
+        cutLoadState={cutLoadState}
+        cuts={cuts}
+        canIncreaseCutCount={Boolean(selectedProject) && cutLoadState !== "loading"}
+        exportSettings={exportSettings}
+        exportState={exportState}
+        fullScenario={fullScenario}
+        generationState={generationState}
+        imageGenerationAssets={imageGenerationAssets}
+        onDecreaseCutCount={decreaseCutCount}
+        onFlushSelectedCut={() => {
+          if (selectedCut) {
+            flushPendingCutPatch(selectedCut.id);
+          }
+        }}
+        onFullScenarioChange={setFullScenario}
+        onIncreaseCutCount={increaseCutCount}
+        onSelectCut={selectCut}
+        onUpdateSelectedCut={updateSelectedCut}
+        projectName={projectName}
+        saveState={saveState}
+        selectedCut={selectedCut}
+        selectedProject={selectedProject}
+      />
     </section>
   );
 }
@@ -676,6 +853,265 @@ function ProjectRail({
       </div>
     </aside>
   );
+}
+
+type ProductionPanelProps = {
+  canIncreaseCutCount: boolean;
+  canvasPreset: CanvasPreset;
+  contentType: ContentType;
+  cutLoadState: LoadState;
+  cuts: Cut[];
+  exportSettings: StudioExportSettings;
+  exportState: ExportState;
+  fullScenario: string;
+  generationState: GenerationState;
+  imageGenerationAssets: ImageGenerationAssets;
+  onDecreaseCutCount: () => void;
+  onFlushSelectedCut: () => void;
+  onFullScenarioChange: (value: string) => void;
+  onIncreaseCutCount: () => void;
+  onSelectCut: (cutId: string) => void;
+  onUpdateSelectedCut: (patch: UpdateCutInput) => void;
+  projectName: string;
+  saveState: SaveState;
+  selectedCut: Cut | null;
+  selectedProject: Project | null;
+};
+
+function ProductionPanel({
+  canIncreaseCutCount,
+  canvasPreset,
+  contentType,
+  cutLoadState,
+  cuts,
+  exportSettings,
+  exportState,
+  fullScenario,
+  generationState,
+  imageGenerationAssets,
+  onDecreaseCutCount,
+  onFlushSelectedCut,
+  onFullScenarioChange,
+  onIncreaseCutCount,
+  onSelectCut,
+  onUpdateSelectedCut,
+  projectName,
+  saveState,
+  selectedCut,
+  selectedProject,
+}: ProductionPanelProps) {
+  const isCardNews = selectedProject?.contentType === "card-news";
+
+  return (
+    <div className="split-content production-panel">
+      <div className="panel-heading production-heading">
+        <div>
+          <p className="eyebrow">{labels.workbench}</p>
+          <h2>{projectName || labels.selectProject}</h2>
+          {selectedProject ? (
+            <span className="project-context-chips">
+              <StudioChip>{contentTypeLabels[contentType]}</StudioChip>
+              <StudioChip>{canvasPresetLabels[canvasPreset]}</StudioChip>
+            </span>
+          ) : (
+            <p>{labels.selectProjectHelp}</p>
+          )}
+        </div>
+        <span className={`save-badge ${saveState}`}>{getSaveLabel(saveState)}</span>
+      </div>
+
+      {isCardNews ? (
+        <section className="full-scenario-panel" aria-label={labels.fullScenario}>
+          <label className="field-stack">
+            {labels.fullScenario}
+            <textarea
+              onChange={(event) => onFullScenarioChange(event.target.value)}
+              placeholder={labels.fullScenarioPlaceholder}
+              rows={5}
+              value={fullScenario}
+            />
+          </label>
+          <button className="production-text-button" disabled type="button">
+            {labels.produceAll}
+          </button>
+        </section>
+      ) : null}
+
+      <section className="production-detail-grid" aria-label={labels.selectedProjectArea}>
+        <CutList
+          cutLoadState={cutLoadState}
+          cuts={cuts}
+          canIncreaseCutCount={canIncreaseCutCount}
+          onDecreaseCutCount={onDecreaseCutCount}
+          onIncreaseCutCount={onIncreaseCutCount}
+          onSelectCut={onSelectCut}
+          selectedCutId={selectedCut?.id ?? ""}
+        />
+
+        <CutEditor
+          onFlushSelectedCut={onFlushSelectedCut}
+          onUpdateSelectedCut={onUpdateSelectedCut}
+          selectedCut={selectedCut}
+        />
+      </section>
+
+      <p className="save-state">
+        {labels.generation}: {getGenerationLabel(generationState)} - {labels.export}:{" "}
+        {getExportLabel(exportState)}
+      </p>
+      <p className="sr-only">
+        {labels.assetSummary} {imageGenerationAssets.characters.length}
+        {labels.assetCountSuffix}, {labels.exportScale} {exportSettings.exportScale}
+      </p>
+    </div>
+  );
+}
+
+type CutListProps = {
+  canIncreaseCutCount: boolean;
+  cutLoadState: LoadState;
+  cuts: Cut[];
+  onDecreaseCutCount: () => void;
+  onIncreaseCutCount: () => void;
+  onSelectCut: (cutId: string) => void;
+  selectedCutId: string;
+};
+
+function CutList({
+  canIncreaseCutCount,
+  cutLoadState,
+  cuts,
+  onDecreaseCutCount,
+  onIncreaseCutCount,
+  onSelectCut,
+  selectedCutId,
+}: CutListProps) {
+  return (
+    <aside className="split-menu workspace-menu production-cut-list" aria-label={labels.cutList}>
+      <div className="storyboard-info">
+        <p className="eyebrow">{labels.cutList}</p>
+        <div className="cut-count-stepper">
+          <span>{labels.cutCount}</span>
+          <div>
+            <button
+              aria-label="\ucef7 \uc218 \uc904\uc774\uae30"
+              disabled={cuts.length === 0}
+              onClick={onDecreaseCutCount}
+              type="button"
+            >
+              -
+            </button>
+            <strong>{cuts.length}</strong>
+            <button
+              aria-label="\ucef7 \uc218 \ub298\ub9ac\uae30"
+              disabled={!canIncreaseCutCount}
+              onClick={onIncreaseCutCount}
+              type="button"
+            >
+              +
+            </button>
+          </div>
+        </div>
+        <p className="save-state">{getCutLoadMessage(cutLoadState)}</p>
+      </div>
+
+      <div className="split-menu-list cut-list">
+        {cuts.map((cut) => {
+          const active = cut.id === selectedCutId;
+
+          return (
+            <button
+              aria-current={active ? "page" : undefined}
+              className="split-menu-item workspace-cut-item"
+              data-active={active}
+              key={cut.id}
+              onClick={() => onSelectCut(cut.id)}
+              type="button"
+            >
+              <strong>
+                #{cut.position} {getCutTitle(cut)}
+              </strong>
+            </button>
+          );
+        })}
+      </div>
+    </aside>
+  );
+}
+
+type CutEditorProps = {
+  onFlushSelectedCut: () => void;
+  onUpdateSelectedCut: (patch: UpdateCutInput) => void;
+  selectedCut: Cut | null;
+};
+
+function CutEditor({ onFlushSelectedCut, onUpdateSelectedCut, selectedCut }: CutEditorProps) {
+  if (!selectedCut) {
+    return (
+      <div className="editor-panel production-editor">
+        <p className="empty-state">{labels.noSelectedCut}</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="editor-panel production-editor">
+      <div className="panel-heading inline-heading">
+        <div>
+          <p className="eyebrow">컷 {selectedCut.position}</p>
+          <h2>{selectedCut.caption || labels.selectedCut}</h2>
+        </div>
+      </div>
+
+      <label className="field-stack">
+        {labels.cutScenario}
+        <textarea
+          onBlur={onFlushSelectedCut}
+          onChange={(event) => onUpdateSelectedCut({ scenario: event.target.value })}
+          placeholder={labels.cutScenarioPlaceholder}
+          rows={5}
+          value={selectedCut.scenario}
+        />
+      </label>
+
+      <label className="field-stack">
+        {labels.caption}
+        <textarea
+          onBlur={onFlushSelectedCut}
+          onChange={(event) => onUpdateSelectedCut({ caption: event.target.value })}
+          placeholder={labels.captionPlaceholder}
+          rows={3}
+          value={selectedCut.caption}
+        />
+      </label>
+
+      <label className="field-stack">
+        {labels.dialogue}
+        <textarea
+          onBlur={onFlushSelectedCut}
+          onChange={(event) => onUpdateSelectedCut({ dialogue: event.target.value })}
+          placeholder={labels.dialoguePlaceholder}
+          rows={4}
+          value={selectedCut.dialogue}
+        />
+      </label>
+
+      <label className="field-stack">
+        {labels.imagePrompt}
+        <textarea
+          onBlur={onFlushSelectedCut}
+          onChange={(event) => onUpdateSelectedCut({ imagePrompt: event.target.value })}
+          placeholder={labels.imagePromptPlaceholder}
+          rows={5}
+          value={selectedCut.imagePrompt}
+        />
+      </label>
+    </div>
+  );
+}
+
+function getCutTitle(cut: Cut) {
+  return cut.caption || cut.scenario || cut.dialogue || labels.noContent;
 }
 
 function getProjectLoadMessage(state: LoadState, projectCount: number) {
