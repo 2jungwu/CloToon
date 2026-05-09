@@ -1089,6 +1089,7 @@ export function StudioWorkbench({ initialProjectId }: StudioWorkbenchProps) {
             </div>
             {selectedProject ? (
               <button
+                aria-label={`${selectedProject.name} ${labels.deleteProject}`}
                 className="studio-workbench-delete"
                 disabled={deletingProjectId === selectedProject.id}
                 onClick={() => deleteProject(selectedProject)}
