@@ -82,7 +82,7 @@
   --app-font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", "Pretendard", Arial, ui-sans-serif,
     system-ui, sans-serif;
   --font-sans: var(--app-font-sans);
-  --background: #f5f5f7;
+  --background: #ffffff;
   --foreground: #1d1d1f;
   --card: #ffffff;
   --card-foreground: #1d1d1f;
@@ -115,7 +115,7 @@
   --sidebar-accent-foreground: #1d1d1f;
   --sidebar-border: #d2d2d7;
   --sidebar-ring: #0071e3;
-  --app-page: #f5f5f7;
+  --app-page: #ffffff;
   --app-surface: #ffffff;
   --app-surface-elevated: #fbfbfd;
   --app-text: #1d1d1f;
@@ -992,6 +992,37 @@ textarea::placeholder {
   width: 100%;
 }
 
+.project-create-button {
+  align-items: center;
+  background: var(--app-blue);
+  border: 1px solid var(--app-blue);
+  border-radius: 999px;
+  color: #ffffff;
+  cursor: pointer;
+  display: inline-flex;
+  font-size: 16px;
+  font-weight: 700;
+  justify-content: center;
+  line-height: 1.25;
+  min-height: 44px;
+  padding: 0 18px;
+  transition:
+    background-color 160ms ease,
+    border-color 160ms ease,
+    box-shadow 160ms ease;
+  width: 100%;
+}
+
+.project-create-button:hover,
+.project-create-button:focus-visible,
+.project-create-button[data-active="true"] {
+  background: var(--app-blue-hover);
+  border-color: var(--app-blue-hover);
+  box-shadow: 0 0 0 4px var(--app-focus);
+  color: #ffffff;
+  outline: 0;
+}
+
 .split-menu-item:hover,
 .split-menu-item:focus-visible,
 .split-menu-item[data-active="true"] {
@@ -1067,6 +1098,116 @@ textarea::placeholder {
 .workspace-menu {
   display: grid;
   gap: 18px;
+}
+
+.storyboard-info {
+  display: grid;
+  gap: 14px;
+}
+
+.storyboard-info h1 {
+  color: var(--app-text);
+  font-size: 28px;
+  font-weight: 800;
+  line-height: 1.18;
+  margin: 0;
+}
+
+.storyboard-info dl {
+  border-top: 1px solid var(--app-border);
+  display: grid;
+  margin: 0;
+}
+
+.storyboard-info dl div {
+  align-items: center;
+  border-bottom: 1px solid var(--app-border);
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  min-width: 0;
+  padding: 10px 0;
+}
+
+.storyboard-info dt {
+  color: var(--app-text-secondary);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.storyboard-info dd {
+  color: var(--app-text);
+  font-size: 14px;
+  font-weight: 700;
+  margin: 0;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cut-count-stepper {
+  align-items: center;
+  border-bottom: 1px solid var(--app-border);
+  border-top: 1px solid var(--app-border);
+  color: var(--app-text);
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  padding: 12px 0;
+}
+
+.cut-count-stepper span {
+  color: var(--app-text-secondary);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.cut-count-stepper > div {
+  align-items: center;
+  display: inline-flex;
+  gap: 8px;
+}
+
+.cut-count-stepper button {
+  align-items: center;
+  background: #ffffff;
+  border: 1px solid var(--app-border);
+  border-radius: 999px;
+  color: var(--app-text);
+  cursor: pointer;
+  display: inline-flex;
+  font-size: 18px;
+  font-weight: 700;
+  height: 32px;
+  justify-content: center;
+  line-height: 1;
+  transition:
+    border-color 160ms ease,
+    color 160ms ease;
+  width: 32px;
+}
+
+.cut-count-stepper button:hover,
+.cut-count-stepper button:focus-visible {
+  border-color: var(--app-blue);
+  color: var(--app-blue);
+  outline: 0;
+}
+
+.cut-count-stepper button:disabled {
+  color: var(--app-text-tertiary);
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.cut-count-stepper strong {
+  color: var(--app-text);
+  display: inline-block;
+  font-size: 16px;
+  font-weight: 800;
+  min-width: 44px;
+  text-align: center;
 }
 
 .workspace-menu .form-grid.compact {

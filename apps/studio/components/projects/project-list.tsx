@@ -133,7 +133,7 @@ export function ProjectList() {
         <div className="split-menu-list">
           <button
             aria-current={activeProjectId === "new" ? "page" : undefined}
-            className="split-menu-item"
+            className="project-create-button"
             data-active={activeProjectId === "new"}
             onClick={() => setActiveProjectId("new")}
             type="button"

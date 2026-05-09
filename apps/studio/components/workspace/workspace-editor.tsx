@@ -1,14 +1,11 @@
 "use client";
 
-import { useMemo, useRef, useState, type CSSProperties } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { toPng } from "html-to-image";
 import JSZip from "jszip";
 import { HugeiconsIcon } from "@hugeicons/react";
 import {
   Add01Icon,
-  ArrowDown01Icon,
-  ArrowUp01Icon,
-  Copy01Icon,
   Delete02Icon,
 } from "@hugeicons/core-free-icons";
 
@@ -16,16 +13,9 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { isAllowedCutImageDataUrl, toCssImageUrl } from "@/lib/cuts/image-data-url";
-import type { Cut, CutImageStatus, CutTemplate } from "@/lib/cuts/types";
+import { toCssImageUrl } from "@/lib/cuts/image-data-url";
+import type { Cut, CutImageStatus } from "@/lib/cuts/types";
 import {
   loadGeminiApiKeyFromStorage,
   loadImageGenerationAssetsFromStorage,
@@ -61,11 +51,6 @@ type ImageGenerationFailure = {
   message?: string;
 };
 
-const templateLabels: Record<CutTemplate, string> = {
-  comic: "인스타툰",
-  "card-news": "카드뉴스",
-};
-
 const statusLabels: Record<CutImageStatus, string> = {
   empty: "이미지 없음",
   mock: "Mock 이미지",
@@ -74,21 +59,19 @@ const statusLabels: Record<CutImageStatus, string> = {
   failed: "생성 실패",
 };
 
+const MINIMUM_CUT_COUNT = 2;
+
 export function WorkspaceEditor({ project, initialCuts }: WorkspaceEditorProps) {
   const [cuts, setCuts] = useState(initialCuts);
   const [selectedCutId, setSelectedCutId] = useState(initialCuts[0]?.id ?? "");
-  const [targetCount, setTargetCount] = useState(String(Math.max(initialCuts.length, 4)));
+  const [targetCount, setTargetCount] = useState(Math.max(initialCuts.length, MINIMUM_CUT_COUNT));
   const [scenario, setScenario] = useState("");
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [generationState, setGenerationState] = useState<GenerationState>({
     status: "idle",
     message: "",
   });
-  const [studioPreferences, setStudioPreferences] = useState(() =>
-    typeof window === "undefined"
-      ? defaultStudioPreferences
-      : loadStudioPreferencesFromStorage(window.localStorage),
-  );
+  const [studioPreferences, setStudioPreferences] = useState(defaultStudioPreferences);
   const [exportState, setExportState] = useState<"idle" | "exporting" | "done" | "error">("idle");
   const exportRootRef = useRef<HTMLDivElement | null>(null);
 
@@ -96,6 +79,19 @@ export function WorkspaceEditor({ project, initialCuts }: WorkspaceEditorProps) 
     () => cuts.find((cut) => cut.id === selectedCutId) ?? cuts[0],
     [cuts, selectedCutId],
   );
+
+  useEffect(() => {
+    let cancelled = false;
+    window.queueMicrotask(() => {
+      if (!cancelled) {
+        setStudioPreferences(loadStudioPreferencesFromStorage(window.localStorage));
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   async function persistCutPatch(cut: Cut, patch: Partial<Cut>) {
     setSaveState("saving");
@@ -142,24 +138,6 @@ export function WorkspaceEditor({ project, initialCuts }: WorkspaceEditorProps) 
     setSelectedCutId(newCut.id);
   }
 
-  async function duplicateCut(cut: Cut) {
-    await persistCutPatch(cut, getEditableCutPatch(cut));
-
-    const response = await fetch(`/api/projects/${project.id}/cuts`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ duplicateFromCutId: cut.id }),
-    });
-
-    if (!response.ok) {
-      return;
-    }
-
-    const { cut: newCut } = (await response.json()) as { cut: Cut };
-    setCuts((current) => [...current, newCut].sort((a, b) => a.position - b.position));
-    setSelectedCutId(newCut.id);
-  }
-
   async function deleteCut(cut: Cut) {
     if (cuts.length <= 1) {
       return;
@@ -182,33 +160,6 @@ export function WorkspaceEditor({ project, initialCuts }: WorkspaceEditorProps) 
     });
   }
 
-  async function moveCut(cut: Cut, direction: -1 | 1) {
-    const sorted = [...cuts].sort((a, b) => a.position - b.position);
-    const index = sorted.findIndex((item) => item.id === cut.id);
-    const target = sorted[index + direction];
-
-    if (!target) {
-      return;
-    }
-
-    const nextOrder = [...sorted];
-    nextOrder[index] = target;
-    nextOrder[index + direction] = cut;
-
-    const response = await fetch(`/api/projects/${project.id}/cuts/reorder`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ cutIds: nextOrder.map((item) => item.id) }),
-    });
-
-    if (!response.ok) {
-      return;
-    }
-
-    const { cuts: reorderedCuts } = (await response.json()) as { cuts: Cut[] };
-    setCuts(reorderedCuts);
-  }
-
   async function updateSelectedCut(field: keyof Cut, value: string) {
     if (!selectedCut) {
       return;
@@ -221,8 +172,8 @@ export function WorkspaceEditor({ project, initialCuts }: WorkspaceEditorProps) 
   }
 
   async function buildManualCuts() {
-    const count = Number.parseInt(targetCount, 10);
-    if (Number.isNaN(count) || count < 1) {
+    const count = Math.max(targetCount, MINIMUM_CUT_COUNT);
+    if (count < MINIMUM_CUT_COUNT) {
       return;
     }
 
@@ -246,40 +197,6 @@ export function WorkspaceEditor({ project, initialCuts }: WorkspaceEditorProps) 
     for (let index = existingCuts.length; index < count; index += 1) {
       await createCut(index + 1, segments[index] ?? "");
     }
-  }
-
-  async function applyMockImage() {
-    if (!selectedCut) {
-      return;
-    }
-
-    await persistCutPatch(selectedCut, {
-      ...getEditableCutPatch(selectedCut),
-      imageDataUrl: createMockImageDataUrl(selectedCut, project),
-      imageStatus: "mock",
-    });
-  }
-
-  async function handleUpload(file: File | null) {
-    if (!file || !selectedCut) {
-      return;
-    }
-
-    const dataUrl = await readFileAsDataUrl(file);
-    setGenerationState({ status: "idle", message: "" });
-    if (!isAllowedCutImageDataUrl(dataUrl)) {
-      setGenerationState({
-        status: "error",
-        message: "PNG, JPEG, WebP 이미지만 업로드할 수 있으며 파일 크기를 줄여야 합니다.",
-      });
-      return;
-    }
-
-    await persistCutPatch(selectedCut, {
-      ...getEditableCutPatch(selectedCut),
-      imageDataUrl: dataUrl,
-      imageStatus: "uploaded",
-    });
   }
 
   async function generateSelectedCutImage() {
@@ -438,34 +355,58 @@ export function WorkspaceEditor({ project, initialCuts }: WorkspaceEditorProps) 
     <>
       <section className="split-layout workspace-layout" aria-label="제작 워크스페이스">
         <aside className="split-menu workspace-menu" aria-label="Cuts menu">
-          <div className="panel-heading">
+          <div className="storyboard-info">
+            <p className="eyebrow">Storyboard</p>
+            <h1>{project.name}</h1>
+            <dl>
+              <div>
+                <dt>유형</dt>
+                <dd>{project.contentType === "card-news" ? "카드뉴스" : "인스타툰"}</dd>
+              </div>
+              <div>
+                <dt>캔버스</dt>
+                <dd>{project.canvasPreset}</dd>
+              </div>
+              <div>
+                <dt>현재 컷</dt>
+                <dd>{sortedCuts.length}개</dd>
+              </div>
+            </dl>
+          </div>
+
+          <div className="cut-count-stepper" aria-label="컷 수">
+            <span>컷 수:</span>
             <div>
-              <p className="eyebrow">Storyboard</p>
-              <h1>{project.name}</h1>
-              <p>전체 시나리오를 입력하거나 컷별로 내용을 다듬어 제작합니다.</p>
+              <button
+                type="button"
+                aria-label="컷 수 줄이기"
+                onClick={() => setTargetCount((current) => Math.max(MINIMUM_CUT_COUNT, current - 1))}
+                disabled={targetCount <= MINIMUM_CUT_COUNT}
+              >
+                -
+              </button>
+              <strong>({targetCount})</strong>
+              <button
+                type="button"
+                aria-label="컷 수 늘리기"
+                onClick={() => setTargetCount((current) => current + 1)}
+              >
+                +
+              </button>
             </div>
           </div>
 
-          <div className="form-grid compact">
+          {project.contentType === "card-news" ? (
             <Label className="field-stack">
-              컷 수
-              <Input value={targetCount} onChange={(event) => setTargetCount(event.target.value)} />
+              전체 시나리오
+              <Textarea
+                value={scenario}
+                onChange={(event) => setScenario(event.target.value)}
+                placeholder="전체 줄거리를 입력하면 컷별 초안 생성에 활용됩니다."
+                rows={6}
+              />
             </Label>
-            <Label className="field-stack">
-              기본 템플릿
-              <Input value={project.contentType === "card-news" ? "카드뉴스" : "인스타툰"} readOnly />
-            </Label>
-          </div>
-
-          <Label className="field-stack">
-            전체 시나리오
-            <Textarea
-              value={scenario}
-              onChange={(event) => setScenario(event.target.value)}
-              placeholder="전체 줄거리를 입력하면 컷별 초안 생성에 활용됩니다."
-              rows={6}
-            />
-          </Label>
+          ) : null}
 
           <div className="toolbar-row">
             <Button type="button" onClick={buildManualCuts}>
@@ -505,31 +446,6 @@ export function WorkspaceEditor({ project, initialCuts }: WorkspaceEditorProps) 
                       <p className="eyebrow">Cut {selectedCut.position}</p>
                       <h2>자막, 대사, 프롬프트</h2>
                     </div>
-                    <Badge className={`badge-${selectedCut.template === "card-news" ? "card-news" : "comic"}`}>
-                      {templateLabels[selectedCut.template]}
-                    </Badge>
-                  </div>
-
-                  <div className="form-grid compact">
-                    <Label className="field-stack">
-                      템플릿
-                      <Select
-                        value={selectedCut.template}
-                        onValueChange={(value) => updateSelectedCut("template", value)}
-                      >
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="comic">인스타툰</SelectItem>
-                          <SelectItem value="card-news">카드뉴스</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </Label>
-                    <Label className="field-stack">
-                      이미지 상태
-                      <Input value={statusLabels[selectedCut.imageStatus]} readOnly />
-                    </Label>
                   </div>
 
                   <Label className="field-stack">
@@ -563,14 +479,6 @@ export function WorkspaceEditor({ project, initialCuts }: WorkspaceEditorProps) 
                       rows={4}
                     />
                   </Label>
-                  <Label className="field-stack">
-                    네거티브 프롬프트
-                    <Textarea
-                      value={selectedCut.negativePrompt}
-                      onChange={(event) => updateSelectedCut("negativePrompt", event.target.value)}
-                      rows={3}
-                    />
-                  </Label>
 
                   <div className="toolbar-row">
                     <Button
@@ -579,32 +487,6 @@ export function WorkspaceEditor({ project, initialCuts }: WorkspaceEditorProps) 
                       disabled={generationState.status === "generating"}
                     >
                       {generationState.status === "generating" ? "이미지 생성 중..." : "이미지 생성"}
-                    </Button>
-                    <Button type="button" variant="secondary" onClick={applyMockImage}>
-                      Mock 이미지
-                    </Button>
-                    <Label className="upload-button">
-                      이미지 업로드
-                      <input
-                        type="file"
-                        accept="image/png,image/jpeg,image/webp"
-                        onChange={(event) => handleUpload(event.target.files?.[0] ?? null)}
-                      />
-                    </Label>
-                  </div>
-
-                  <div className="toolbar-row muted-actions">
-                    <Button type="button" variant="secondary" onClick={() => moveCut(selectedCut, -1)}>
-                      <HugeiconsIcon icon={ArrowUp01Icon} size={18} aria-hidden />
-                      위로
-                    </Button>
-                    <Button type="button" variant="secondary" onClick={() => moveCut(selectedCut, 1)}>
-                      <HugeiconsIcon icon={ArrowDown01Icon} size={18} aria-hidden />
-                      아래로
-                    </Button>
-                    <Button type="button" variant="secondary" onClick={() => duplicateCut(selectedCut)}>
-                      <HugeiconsIcon icon={Copy01Icon} size={18} aria-hidden />
-                      복제
                     </Button>
                     <Button type="button" variant="destructive" onClick={() => deleteCut(selectedCut)}>
                       <HugeiconsIcon icon={Delete02Icon} size={18} aria-hidden />
@@ -814,41 +696,6 @@ function getStatusMessageClass(
   return saveState;
 }
 
-function createMockImageDataUrl(cut: Cut, project: Project) {
-  const seed = `${project.id}-${cut.id}-${cut.position}`;
-  const hue = [...seed].reduce((total, char) => total + char.charCodeAt(0), 0) % 360;
-  const caption = escapeXml(cut.caption || `Cut ${cut.position}`);
-  const prompt = escapeXml((cut.imagePrompt || cut.scenario || project.name).slice(0, 92));
-  const svg = `
-    <svg xmlns="http://www.w3.org/2000/svg" width="1080" height="1080" viewBox="0 0 1080 1080">
-      <defs>
-        <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0%" stop-color="hsl(${hue}, 74%, 72%)"/>
-          <stop offset="52%" stop-color="hsl(${(hue + 64) % 360}, 74%, 86%)"/>
-          <stop offset="100%" stop-color="hsl(${(hue + 148) % 360}, 74%, 78%)"/>
-        </linearGradient>
-      </defs>
-      <rect width="1080" height="1080" fill="url(#bg)"/>
-      <circle cx="250" cy="260" r="150" fill="rgba(255,255,255,0.32)"/>
-      <circle cx="830" cy="310" r="210" fill="rgba(20,25,35,0.12)"/>
-      <rect x="162" y="690" width="756" height="142" rx="34" fill="rgba(255,255,255,0.76)"/>
-      <text x="540" y="758" text-anchor="middle" font-family="Arial, sans-serif" font-size="54" font-weight="700" fill="#111827">${caption}</text>
-      <text x="540" y="812" text-anchor="middle" font-family="Arial, sans-serif" font-size="28" fill="#374151">${prompt}</text>
-    </svg>
-  `;
-
-  return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
-}
-
-function readFileAsDataUrl(file: File) {
-  return new Promise<string>((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(String(reader.result));
-    reader.onerror = () => reject(reader.error);
-    reader.readAsDataURL(file);
-  });
-}
-
 function downloadDataUrl(dataUrl: string, fileName: string) {
   const anchor = document.createElement("a");
   anchor.href = dataUrl;
@@ -897,14 +744,6 @@ function safeFileName(value: string) {
 }
 
 function escapeHtml(value: string) {
-  return value
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
-}
-
-function escapeXml(value: string) {
   return value
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
