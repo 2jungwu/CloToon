@@ -1,6 +1,6 @@
 "use client";
 
-import type { CSSProperties, FormEvent, ReactNode } from "react";
+import type { CSSProperties, FormEvent, KeyboardEvent, ReactNode, RefObject } from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toPng } from "html-to-image";
 import JSZip from "jszip";
@@ -191,7 +191,6 @@ export function StudioWorkbench({ initialProjectId }: StudioWorkbenchProps) {
   const [newProjectName, setNewProjectName] = useState("");
   const [newContentType, setNewContentType] = useState<ContentType>("comic");
   const [newCanvasPreset, setNewCanvasPreset] = useState<CanvasPreset>("1:1");
-  const [projectDrawerOpen] = useState(true);
   const [projectCreateModalOpen, setProjectCreateModalOpen] = useState(false);
   const [projectActionError, setProjectActionError] = useState<string | null>(null);
   const [creatingProject, setCreatingProject] = useState(false);
@@ -216,6 +215,7 @@ export function StudioWorkbench({ initialProjectId }: StudioWorkbenchProps) {
   const patchTimersRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
   const cutPatchChainsRef = useRef<Record<string, Promise<Cut | null>>>({});
   const generationInFlightRef = useRef(false);
+  const newProjectButtonRef = useRef<HTMLButtonElement | null>(null);
 
   const patchCut = useCallback(
     (cutId: string, patch: UpdateCutInput, projectId = selectedProjectIdRef.current) => {
@@ -546,6 +546,16 @@ export function StudioWorkbench({ initialProjectId }: StudioWorkbenchProps) {
     }
   }
 
+  function openProjectCreateModal() {
+    setProjectActionError(null);
+    setProjectCreateModalOpen(true);
+  }
+
+  function closeProjectCreateModal() {
+    setProjectCreateModalOpen(false);
+    window.requestAnimationFrame(() => newProjectButtonRef.current?.focus());
+  }
+
   async function createProject(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
@@ -588,7 +598,7 @@ export function StudioWorkbench({ initialProjectId }: StudioWorkbenchProps) {
       setNewProjectName("");
       setProjectLoadState("ready");
       selectProject(createdProject);
-      setProjectCreateModalOpen(false);
+      closeProjectCreateModal();
     } catch {
       setProjectActionError(labels.createProjectError);
     } finally {
@@ -1054,14 +1064,11 @@ export function StudioWorkbench({ initialProjectId }: StudioWorkbenchProps) {
           deletingProjectId={deletingProjectId}
           error={projectActionError}
           onDeleteProject={deleteProject}
-          onNewProject={() => {
-            setProjectActionError(null);
-            setProjectCreateModalOpen(true);
-          }}
+          onNewProject={openProjectCreateModal}
           onProjectSelect={handleProjectSelect}
-          open={projectDrawerOpen}
           projectLoadState={projectLoadState}
           projects={projects}
+          newProjectButtonRef={newProjectButtonRef}
           selectedProjectId={selectedProjectId}
         />
 
@@ -1116,7 +1123,7 @@ export function StudioWorkbench({ initialProjectId }: StudioWorkbenchProps) {
           onCanvasPresetChange={setNewCanvasPreset}
           onClose={() => {
             if (!creatingProject) {
-              setProjectCreateModalOpen(false);
+              closeProjectCreateModal();
             }
           }}
           onContentTypeChange={setNewContentType}
@@ -1153,10 +1160,10 @@ function StudioChip({ children }: StudioChipProps) {
 type ProjectDrawerProps = {
   deletingProjectId: string;
   error: string | null;
+  newProjectButtonRef: RefObject<HTMLButtonElement | null>;
   onDeleteProject: (project: Project) => void;
   onNewProject: () => void;
   onProjectSelect: (projectId: string) => void;
-  open: boolean;
   projectLoadState: LoadState;
   projects: Project[];
   selectedProjectId: string;
@@ -1165,26 +1172,27 @@ type ProjectDrawerProps = {
 function ProjectDrawer({
   deletingProjectId,
   error,
+  newProjectButtonRef,
   onDeleteProject,
   onNewProject,
   onProjectSelect,
-  open,
   projectLoadState,
   projects,
   selectedProjectId,
 }: ProjectDrawerProps) {
   return (
-    <aside
-      className="split-menu workspace-menu project-drawer"
-      aria-label={labels.projectsTitle}
-      data-open={open}
-    >
+    <aside className="split-menu workspace-menu project-drawer" aria-label={labels.projectsTitle}>
       <div className="project-drawer-head">
         <div>
           <p className="eyebrow">{labels.studio}</p>
           <h1>{labels.projectsTitle}</h1>
         </div>
-        <button className="project-create-button" onClick={onNewProject} type="button">
+        <button
+          className="project-create-button"
+          onClick={onNewProject}
+          ref={newProjectButtonRef}
+          type="button"
+        >
           {labels.newProject}
         </button>
       </div>
@@ -1259,12 +1267,64 @@ function ProjectCreateModal({
   onCreateProject,
   onNameChange,
 }: ProjectCreateModalProps) {
+  const modalRef = useRef<HTMLFormElement | null>(null);
+  const nameInputRef = useRef<HTMLInputElement | null>(null);
+
+  useEffect(() => {
+    nameInputRef.current?.focus();
+  }, []);
+
+  function handleModalKeyDown(event: KeyboardEvent<HTMLFormElement>) {
+    if (event.key === "Escape") {
+      event.preventDefault();
+      onClose();
+      return;
+    }
+
+    if (event.key !== "Tab") {
+      return;
+    }
+
+    const focusableElements = Array.from(
+      modalRef.current?.querySelectorAll<HTMLElement>(
+        [
+          "button:not([disabled])",
+          "input:not([disabled])",
+          "textarea:not([disabled])",
+          '[data-slot="select-trigger"]:not([disabled])',
+          '[tabindex]:not([tabindex="-1"])',
+        ].join(", "),
+      ) ?? [],
+    ).filter((element) => element.offsetParent !== null);
+
+    if (focusableElements.length === 0) {
+      return;
+    }
+
+    const firstElement = focusableElements[0];
+    const lastElement = focusableElements[focusableElements.length - 1];
+
+    if (event.shiftKey && document.activeElement === firstElement) {
+      event.preventDefault();
+      lastElement.focus();
+      return;
+    }
+
+    if (!event.shiftKey && document.activeElement === lastElement) {
+      event.preventDefault();
+      firstElement.focus();
+    }
+  }
+
   return (
     <div className="project-modal-overlay" role="presentation">
       <form
+        aria-modal="true"
         aria-labelledby="project-create-modal-title"
         className="project-create-modal"
+        onKeyDown={handleModalKeyDown}
         onSubmit={onCreateProject}
+        ref={modalRef}
         role="dialog"
       >
         <div className="project-modal-head">
@@ -1281,6 +1341,7 @@ function ProjectCreateModal({
             autoFocus
             onChange={(event) => onNameChange(event.target.value)}
             placeholder={labels.projectNamePlaceholder}
+            ref={nameInputRef}
             value={name}
           />
         </label>
@@ -1291,7 +1352,7 @@ function ProjectCreateModal({
             <SelectTrigger aria-label={labels.contentType}>
               <SelectValue />
             </SelectTrigger>
-            <SelectContent>
+            <SelectContent className="project-modal-select-content">
               <SelectItem value="comic">{labels.comic}</SelectItem>
               <SelectItem value="card-news">{labels.cardNews}</SelectItem>
             </SelectContent>
@@ -1307,7 +1368,7 @@ function ProjectCreateModal({
             <SelectTrigger aria-label={labels.canvas}>
               <SelectValue />
             </SelectTrigger>
-            <SelectContent>
+            <SelectContent className="project-modal-select-content">
               <SelectItem value="1:1">1:1</SelectItem>
               <SelectItem value="4:5">4:5</SelectItem>
               <SelectItem value="9:16">9:16</SelectItem>
