@@ -39,7 +39,6 @@ export type ImageGenerationCut = {
   caption: string;
   dialogue: string;
   imagePrompt: string;
-  negativePrompt: string;
 };
 
 export type BuildImagePromptInput = {

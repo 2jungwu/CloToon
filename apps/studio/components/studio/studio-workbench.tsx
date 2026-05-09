@@ -661,7 +661,6 @@ export function StudioWorkbench({ initialProjectId }: StudioWorkbenchProps) {
           caption: "",
           dialogue: "",
           imagePrompt: "",
-          negativePrompt: "",
         }),
       });
 
@@ -826,7 +825,6 @@ export function StudioWorkbench({ initialProjectId }: StudioWorkbenchProps) {
             caption: savedCut.caption,
             dialogue: savedCut.dialogue,
             imagePrompt: savedCut.imagePrompt,
-            negativePrompt: savedCut.negativePrompt,
           },
           assets,
         }),

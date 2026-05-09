@@ -2,16 +2,16 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import {
-  buildImageGenerationPrompt,
-  GEMINI_IMAGE_MODEL,
-  getSelectedCharacter,
-} from "@/lib/image-generation/prompt-builder";
-import {
   isAllowedReferenceImageDataUrl,
   isSupportedGeneratedImageMimeType,
   maxCutImageDataUrlLength,
   maxReferenceImageDataUrlLength,
 } from "@/lib/cuts/image-data-url";
+import {
+  buildImageGenerationPrompt,
+  GEMINI_IMAGE_MODEL,
+  getSelectedCharacter,
+} from "@/lib/image-generation/prompt-builder";
 
 export const runtime = "nodejs";
 export const maxDuration = 120;
@@ -51,7 +51,6 @@ const requestSchema = z.object({
     caption: z.string().max(1000),
     dialogue: z.string().max(2000),
     imagePrompt: z.string().max(4000),
-    negativePrompt: z.string().max(2000),
   }),
   assets: z.object({
     selectedCharacterId: z.string().max(200),
