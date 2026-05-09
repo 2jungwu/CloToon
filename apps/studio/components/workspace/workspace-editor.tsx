@@ -6,10 +6,8 @@ import JSZip from "jszip";
 import { HugeiconsIcon } from "@hugeicons/react";
 import {
   Add01Icon,
-  Delete02Icon,
 } from "@hugeicons/core-free-icons";
 
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -64,7 +62,6 @@ const MINIMUM_CUT_COUNT = 2;
 export function WorkspaceEditor({ project, initialCuts }: WorkspaceEditorProps) {
   const [cuts, setCuts] = useState(initialCuts);
   const [selectedCutId, setSelectedCutId] = useState(initialCuts[0]?.id ?? "");
-  const [targetCount, setTargetCount] = useState(Math.max(initialCuts.length, MINIMUM_CUT_COUNT));
   const [scenario, setScenario] = useState("");
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [generationState, setGenerationState] = useState<GenerationState>({
@@ -172,7 +169,7 @@ export function WorkspaceEditor({ project, initialCuts }: WorkspaceEditorProps) 
   }
 
   async function buildManualCuts() {
-    const count = Math.max(targetCount, MINIMUM_CUT_COUNT);
+    const count = Math.max(cuts.length, MINIMUM_CUT_COUNT);
     if (count < MINIMUM_CUT_COUNT) {
       return;
     }
@@ -350,6 +347,18 @@ export function WorkspaceEditor({ project, initialCuts }: WorkspaceEditorProps) 
   }
 
   const sortedCuts = [...cuts].sort((a, b) => a.position - b.position);
+  const cutCount = sortedCuts.length;
+
+  function increaseCutCount() {
+    void createCut();
+  }
+
+  function decreaseCutCount() {
+    const lastCut = sortedCuts[sortedCuts.length - 1];
+    if (lastCut) {
+      void deleteCut(lastCut);
+    }
+  }
 
   return (
     <>
@@ -357,7 +366,6 @@ export function WorkspaceEditor({ project, initialCuts }: WorkspaceEditorProps) 
         <aside className="split-menu workspace-menu" aria-label="Cuts menu">
           <div className="storyboard-info">
             <p className="eyebrow">Storyboard</p>
-            <h1>{project.name}</h1>
             <dl>
               <div>
                 <dt>유형</dt>
@@ -366,10 +374,6 @@ export function WorkspaceEditor({ project, initialCuts }: WorkspaceEditorProps) 
               <div>
                 <dt>캔버스</dt>
                 <dd>{project.canvasPreset}</dd>
-              </div>
-              <div>
-                <dt>현재 컷</dt>
-                <dd>{sortedCuts.length}개</dd>
               </div>
             </dl>
           </div>
@@ -380,16 +384,16 @@ export function WorkspaceEditor({ project, initialCuts }: WorkspaceEditorProps) 
               <button
                 type="button"
                 aria-label="컷 수 줄이기"
-                onClick={() => setTargetCount((current) => Math.max(MINIMUM_CUT_COUNT, current - 1))}
-                disabled={targetCount <= MINIMUM_CUT_COUNT}
+                onClick={decreaseCutCount}
+                disabled={cutCount <= 1}
               >
                 -
               </button>
-              <strong>({targetCount})</strong>
+              <strong>{cutCount}</strong>
               <button
                 type="button"
                 aria-label="컷 수 늘리기"
-                onClick={() => setTargetCount((current) => current + 1)}
+                onClick={increaseCutCount}
               >
                 +
               </button>
@@ -408,16 +412,14 @@ export function WorkspaceEditor({ project, initialCuts }: WorkspaceEditorProps) 
             </Label>
           ) : null}
 
-          <div className="toolbar-row">
-            <Button type="button" onClick={buildManualCuts}>
-              <HugeiconsIcon icon={Add01Icon} size={18} aria-hidden />
-              컷 초안 생성
-            </Button>
-            <Button type="button" variant="secondary" onClick={() => createCut()}>
-              <HugeiconsIcon icon={Add01Icon} size={18} aria-hidden />
-              빈 컷 추가
-            </Button>
-          </div>
+          {project.contentType === "card-news" ? (
+            <div className="toolbar-row">
+              <Button type="button" onClick={buildManualCuts}>
+                <HugeiconsIcon icon={Add01Icon} size={18} aria-hidden />
+                컷 초안 생성
+              </Button>
+            </div>
+          ) : null}
 
           <div className="split-menu-list cut-list" aria-label="컷 목록">
             {sortedCuts.map((cut) => (
@@ -489,7 +491,6 @@ export function WorkspaceEditor({ project, initialCuts }: WorkspaceEditorProps) 
                       {generationState.status === "generating" ? "이미지 생성 중..." : "이미지 생성"}
                     </Button>
                     <Button type="button" variant="destructive" onClick={() => deleteCut(selectedCut)}>
-                      <HugeiconsIcon icon={Delete02Icon} size={18} aria-hidden />
                       삭제
                     </Button>
                   </div>
@@ -513,7 +514,6 @@ export function WorkspaceEditor({ project, initialCuts }: WorkspaceEditorProps) 
                   <p className="eyebrow">HTML Preview</p>
                   <h2>이미지 원본</h2>
                 </div>
-                <Badge className="badge-canvas">{project.canvasPreset}</Badge>
               </div>
 
               {selectedCut ? (

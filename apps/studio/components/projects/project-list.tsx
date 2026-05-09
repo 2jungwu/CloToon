@@ -2,8 +2,6 @@
 
 import { FormEvent, useEffect, useState } from "react";
 import Link from "next/link";
-import { Delete02Icon } from "@hugeicons/core-free-icons";
-import { HugeiconsIcon } from "@hugeicons/react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -249,7 +247,7 @@ export function ProjectList() {
               <span>{activeProject.canvasPreset} 캔버스 제작 워크스페이스</span>
             </div>
             <div className="toolbar-row">
-              <Button asChild type="button">
+              <Button asChild>
                 <Link href={`/workspace/${activeProject.id}`}>워크스페이스 열기</Link>
               </Button>
               <Button
@@ -259,7 +257,6 @@ export function ProjectList() {
                 type="button"
                 variant="destructive"
               >
-                <HugeiconsIcon icon={Delete02Icon} size={16} aria-hidden />
                 {deletingId === activeProject.id ? "삭제 중..." : "삭제"}
               </Button>
             </div>
