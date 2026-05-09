@@ -1286,6 +1286,17 @@ textarea::placeholder {
   gap: 18px;
 }
 
+.editor-action-row {
+  display: flex;
+  justify-content: flex-start;
+}
+
+.generation-message {
+  font-size: 13px;
+  font-weight: 600;
+  margin: -12px 0 0;
+}
+
 .production-editor textarea,
 .full-scenario-panel textarea {
   background: var(--app-surface);

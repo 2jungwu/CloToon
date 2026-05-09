@@ -12,6 +12,10 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import type { Cut, CutTemplate, UpdateCutInput } from "@/lib/cuts/types";
+import {
+  loadGeminiApiKeyFromStorage,
+  loadImageGenerationAssetsFromStorage,
+} from "@/lib/image-generation/storage";
 import type { ImageGenerationAssets } from "@/lib/image-generation/types";
 import type { CanvasPreset, ContentType, Project } from "@/lib/projects/types";
 import type { StudioExportSettings } from "@/lib/studio-preferences";
@@ -39,6 +43,18 @@ type CutsResponse = {
 
 type CutResponse = {
   cut: Cut;
+};
+
+type ImageGenerationSuccess = {
+  imageDataUrl: string;
+  mimeType: string;
+  model: string;
+};
+
+type ImageGenerationFailure = {
+  error: string;
+  status?: string;
+  message?: string;
 };
 
 const labels = {
@@ -76,6 +92,7 @@ const labels = {
   dialoguePlaceholder: "\ub300\uc0ac \ub610\ub294 \ubcf8\ubb38\uc744 \uc785\ub825\ud558\uc138\uc694.",
   imagePrompt: "\uc774\ubbf8\uc9c0 \ud504\ub86c\ud504\ud2b8",
   imagePromptPlaceholder: "\uc774\ubbf8\uc9c0\ub85c \ub9cc\ub4e4 \uc7a5\uba74\uc744 \uc124\uba85\ud558\uc138\uc694.",
+  generateImage: "\uc774\ubbf8\uc9c0 \uc0dd\uc131",
   none: "\uc5c6\uc74c",
   generation: "\uc0dd\uc131",
   export: "\ub0b4\ubcf4\ub0b4\uae30",
@@ -95,11 +112,26 @@ const labels = {
   saving: "\uc800\uc7a5 \uc911",
   saved: "\uc800\uc7a5\ub428",
   saveError: "\uc800\uc7a5 \uc624\ub958",
+  saveCutError: "\ucef7\uc744 \uc800\uc7a5\ud558\uc9c0 \ubabb\ud588\uc2b5\ub2c8\ub2e4.",
   shell: "\uc258",
   generating: "\uc0dd\uc131 \uc911",
   done: "\uc644\ub8cc",
   waiting: "\ub300\uae30",
   exporting: "\ub0b4\ubcf4\ub0b4\ub294 \uc911",
+  missingApiKey: "\uc790\uc0b0 > API Key\uc5d0\uc11c Gemini API Key\ub97c \uba3c\uc800 \uc800\uc7a5\ud574\uc8fc\uc138\uc694.",
+  generationSaving: "\ucef7 \uc218\uc815 \ub0b4\uc6a9\uc744 \uc800\uc7a5\ud55c \ub4a4 \uc774\ubbf8\uc9c0\ub97c \uc0dd\uc131\ud558\ub294 \uc911...",
+  generationDone: "\uc774\ubbf8\uc9c0 \uc0dd\uc131\uc774 \uc644\ub8cc\ub418\uc5c8\uc2b5\ub2c8\ub2e4.",
+  generationFailed: "\uc774\ubbf8\uc9c0 \uc0dd\uc131\uc5d0 \uc2e4\ud328\ud588\uc2b5\ub2c8\ub2e4.",
+  onePassCardNewsOnly: "\ud55c \ubc88\uc5d0 \uc81c\uc791\uc740 \uce74\ub4dc\ub274\uc2a4 \ud504\ub85c\uc81d\ud2b8\uc5d0\uc11c\ub9cc \uc0ac\uc6a9\ud560 \uc218 \uc788\uc2b5\ub2c8\ub2e4.",
+  onePassScenarioRequired: "\uc804\uccb4 \uc2dc\ub098\ub9ac\uc624\ub97c \uba3c\uc800 \uc785\ub825\ud574\uc8fc\uc138\uc694.",
+  onePassReady: "\ud55c \ubc88\uc5d0 \uc81c\uc791\ud560 \ucef7\uc744 \uc900\ube44\ud558\ub294 \uc911...",
+  onePassProgressSuffix: "\ubc88\uc9f8 \ucef7 \uc774\ubbf8\uc9c0 \uc0dd\uc131 \uc911",
+  apiKeyError: "Gemini API Key\ub97c \ud655\uc778\ud574\uc8fc\uc138\uc694.",
+  quotaError:
+    "Gemini \uc774\ubbf8\uc9c0 \uc0dd\uc131 \ud560\ub2f9\ub7c9\uc774 \ubd80\uc871\ud569\ub2c8\ub2e4. Google AI Studio\uc758 billing/quota\ub97c \ud655\uc778\ud574\uc8fc\uc138\uc694.",
+  badRequestError: "\uc774\ubbf8\uc9c0 \uc0dd\uc131 \uc694\uccad\uc744 \ub9cc\ub4e4\uc9c0 \ubabb\ud588\uc2b5\ub2c8\ub2e4.",
+  networkError: "\uc774\ubbf8\uc9c0 \uc0dd\uc131 \uc694\uccad \uc911 \ub124\ud2b8\uc6cc\ud06c \uc624\ub958\uac00 \ubc1c\uc0dd\ud588\uc2b5\ub2c8\ub2e4. \uc7a0\uc2dc \ud6c4 \ub2e4\uc2dc \uc2dc\ub3c4\ud574\uc8fc\uc138\uc694.",
+  serviceError: "Gemini \uc11c\ube44\uc2a4 \uc751\ub2f5\uc774 \ubd88\uc548\uc815\ud569\ub2c8\ub2e4. \uc7a0\uc2dc \ud6c4 \ub2e4\uc2dc \uc2dc\ub3c4\ud574\uc8fc\uc138\uc694.",
 };
 
 const contentTypeLabels: Record<ContentType, string> = {
@@ -151,7 +183,8 @@ export function StudioWorkbench({ initialProjectId }: StudioWorkbenchProps) {
   const [projectLoadState, setProjectLoadState] = useState<LoadState>("idle");
   const [cutLoadState, setCutLoadState] = useState<LoadState>("idle");
   const [saveState, setSaveState] = useState<SaveState>("idle");
-  const [generationState] = useState<GenerationState>("idle");
+  const [generationState, setGenerationState] = useState<GenerationState>("idle");
+  const [generationMessage, setGenerationMessage] = useState("");
   const [exportState] = useState<ExportState>("idle");
   const [imageGenerationAssets] = useState<ImageGenerationAssets>(emptyImageGenerationAssets);
   const [exportSettings] = useState<StudioExportSettings>(defaultExportSettings);
@@ -163,15 +196,16 @@ export function StudioWorkbench({ initialProjectId }: StudioWorkbenchProps) {
   const pendingCutPatchesRef = useRef<Record<string, UpdateCutInput>>({});
   const pendingCutProjectIdsRef = useRef<Record<string, string>>({});
   const patchTimersRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
-  const cutPatchChainsRef = useRef<Record<string, Promise<void>>>({});
+  const cutPatchChainsRef = useRef<Record<string, Promise<Cut | null>>>({});
+  const generationInFlightRef = useRef(false);
 
   const patchCut = useCallback(
-    async (cutId: string, patch: UpdateCutInput, projectId = selectedProjectIdRef.current) => {
+    (cutId: string, patch: UpdateCutInput, projectId = selectedProjectIdRef.current) => {
       if (!projectId) {
-        return;
+        return Promise.resolve(null);
       }
 
-      const currentChain = cutPatchChainsRef.current[cutId] ?? Promise.resolve();
+      const currentChain = cutPatchChainsRef.current[cutId] ?? Promise.resolve(null);
 
       const nextChain = currentChain
         .catch(() => undefined)
@@ -191,15 +225,22 @@ export function StudioWorkbench({ initialProjectId }: StudioWorkbenchProps) {
               throw new Error("Unable to update cut.");
             }
 
-            await response.json();
+            const payload = (await response.json()) as CutResponse;
 
             if (selectedProjectIdRef.current === projectId) {
+              setCuts((currentCuts) =>
+                currentCuts.map((cut) => (cut.id === payload.cut.id ? payload.cut : cut)),
+              );
               setSaveState("saved");
             }
+
+            return payload.cut;
           } catch {
             if (selectedProjectIdRef.current === projectId) {
               setSaveState("error");
             }
+
+            return null;
           }
         })
         .finally(() => {
@@ -209,6 +250,7 @@ export function StudioWorkbench({ initialProjectId }: StudioWorkbenchProps) {
         });
 
       cutPatchChainsRef.current[cutId] = nextChain;
+      return nextChain;
     },
     [],
   );
@@ -229,10 +271,10 @@ export function StudioWorkbench({ initialProjectId }: StudioWorkbenchProps) {
       delete pendingCutProjectIdsRef.current[cutId];
 
       if (!pendingPatch) {
-        return;
+        return cutPatchChainsRef.current[cutId] ?? Promise.resolve(null);
       }
 
-      void patchCut(cutId, pendingPatch, projectId);
+      return patchCut(cutId, pendingPatch, projectId);
     },
     [patchCut],
   );
@@ -252,6 +294,44 @@ export function StudioWorkbench({ initialProjectId }: StudioWorkbenchProps) {
     delete pendingCutPatchesRef.current[cutId];
     delete pendingCutProjectIdsRef.current[cutId];
   }, []);
+
+  const saveEditableCut = useCallback(
+    async (cut: Cut, patch: UpdateCutInput = {}) => {
+      const timer = patchTimersRef.current[cut.id];
+
+      if (timer) {
+        clearTimeout(timer);
+      }
+
+      const pendingPatch = pendingCutPatchesRef.current[cut.id];
+      const projectId = pendingCutProjectIdsRef.current[cut.id] ?? cut.projectId;
+      const mergedPatch = {
+        ...pendingPatch,
+        ...patch,
+      };
+
+      delete patchTimersRef.current[cut.id];
+      delete pendingCutPatchesRef.current[cut.id];
+      delete pendingCutProjectIdsRef.current[cut.id];
+
+      if (Object.keys(mergedPatch).length === 0) {
+        return (await cutPatchChainsRef.current[cut.id]) ?? cut;
+      }
+
+      setCuts((currentCuts) =>
+        currentCuts.map((item) => (item.id === cut.id ? { ...item, ...mergedPatch } : item)),
+      );
+
+      const savedCut = await patchCut(cut.id, mergedPatch, projectId);
+
+      if (!savedCut) {
+        throw new Error(labels.saveCutError);
+      }
+
+      return savedCut;
+    },
+    [patchCut],
+  );
 
   const selectCut = useCallback((cutId: string) => {
     if (selectedCutIdRef.current && selectedCutIdRef.current !== cutId) {
@@ -570,10 +650,13 @@ export function StudioWorkbench({ initialProjectId }: StudioWorkbenchProps) {
       selectCut(payload.cut.id);
       setCutLoadState("ready");
       setSaveState("saved");
+      return payload.cut;
     } catch {
       if (selectedProjectIdRef.current === projectId) {
         setSaveState("error");
       }
+
+      return null;
     }
   }
 
@@ -625,6 +708,9 @@ export function StudioWorkbench({ initialProjectId }: StudioWorkbenchProps) {
       return;
     }
 
+    setGenerationState("idle");
+    setGenerationMessage("");
+
     const cutId = selectedCut.id;
     const projectId = selectedProjectIdRef.current;
 
@@ -667,6 +753,174 @@ export function StudioWorkbench({ initialProjectId }: StudioWorkbenchProps) {
     void deleteCut(lastCut.id);
   }
 
+  function loadGeminiApiKeyForGeneration() {
+    const apiKey = loadGeminiApiKeyFromStorage(window.localStorage);
+
+    if (!apiKey) {
+      throw new Error(labels.missingApiKey);
+    }
+
+    return apiKey;
+  }
+
+  async function generateImageForCut(cut: Cut, patch: UpdateCutInput = {}) {
+    const project = projectsRef.current.find((item) => item.id === cut.projectId) ?? selectedProject;
+
+    if (!project) {
+      throw new Error(labels.projectLoadError);
+    }
+
+    const apiKey = loadGeminiApiKeyForGeneration();
+
+    let savedCut: Cut | null = null;
+
+    try {
+      const assets = limitExpressionReferences(loadImageGenerationAssetsFromStorage(window.localStorage));
+      savedCut = await saveEditableCut(cut, patch);
+
+      const response = await fetch("/api/images/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          apiKey,
+          project: {
+            id: project.id,
+            name: project.name,
+            contentType: project.contentType,
+            canvasPreset: project.canvasPreset,
+          },
+          cut: {
+            id: savedCut.id,
+            position: savedCut.position,
+            template: savedCut.template,
+            scenario: savedCut.scenario,
+            caption: savedCut.caption,
+            dialogue: savedCut.dialogue,
+            imagePrompt: savedCut.imagePrompt,
+            negativePrompt: savedCut.negativePrompt,
+          },
+          assets,
+        }),
+      });
+      const payload = (await response.json().catch(() => null)) as
+        | ImageGenerationSuccess
+        | ImageGenerationFailure
+        | null;
+
+      if (!response.ok || !payload || !("imageDataUrl" in payload)) {
+        throw new Error(
+          getImageGenerationErrorMessage(response.status, payload && "error" in payload ? payload : null),
+        );
+      }
+
+      return await saveEditableCut(savedCut, {
+        imageDataUrl: payload.imageDataUrl,
+        imageStatus: "generated",
+      });
+    } catch (error) {
+      if (savedCut) {
+        await saveEditableCut(savedCut, { imageStatus: "failed" }).catch(() => undefined);
+      }
+
+      throw error;
+    }
+  }
+
+  async function generateSelectedCutImage() {
+    if (!selectedCut || generationInFlightRef.current) {
+      return;
+    }
+
+    generationInFlightRef.current = true;
+    setGenerationState("generating");
+    setGenerationMessage(labels.generationSaving);
+
+    try {
+      await generateImageForCut(selectedCut);
+      setGenerationState("done");
+      setGenerationMessage(labels.generationDone);
+    } catch (error) {
+      setGenerationState("error");
+      setGenerationMessage(getClientImageGenerationErrorMessage(error));
+    } finally {
+      generationInFlightRef.current = false;
+    }
+  }
+
+  async function buildCardNewsInOnePass() {
+    if (!selectedProject || generationInFlightRef.current) {
+      return;
+    }
+
+    generationInFlightRef.current = true;
+
+    try {
+      loadGeminiApiKeyForGeneration();
+
+      if (selectedProject.contentType !== "card-news") {
+        setGenerationState("error");
+        setGenerationMessage(labels.onePassCardNewsOnly);
+        return;
+      }
+
+      if (fullScenario.trim().length === 0) {
+        setGenerationState("error");
+        setGenerationMessage(labels.onePassScenarioRequired);
+        return;
+      }
+
+      setGenerationState("generating");
+      setGenerationMessage(labels.onePassReady);
+
+      const total = Math.max(cuts.length, 1);
+      const segments = splitScenario(fullScenario, total);
+      const preparedCuts: Cut[] = [...cuts].sort((a, b) => a.position - b.position);
+
+      while (preparedCuts.length < total) {
+        const createdCut = await createCut();
+
+        if (!createdCut) {
+          throw new Error(labels.saveCutError);
+        }
+
+        preparedCuts.push(createdCut);
+      }
+
+      const savedCuts: Cut[] = [];
+
+      for (let index = 0; index < total; index += 1) {
+        const segment = segments[index] ?? "";
+        const cut = preparedCuts[index];
+
+        if (!cut) {
+          throw new Error(labels.saveCutError);
+        }
+
+        savedCuts.push(
+          await saveEditableCut(cut, {
+            scenario: segment,
+            caption: `\ucef7 ${index + 1}`,
+            dialogue: segment,
+            imagePrompt: `\uce74\ub4dc\ub274\uc2a4 \ucef7 ${index + 1}: ${segment}. \uae54\ub054\ud55c \uc5d0\ub514\ud1a0\ub9ac\uc5bc \uce74\ub4dc\ub274\uc2a4 \uc774\ubbf8\uc9c0, \uc77d\uc744 \uc218 \uc788\ub294 \uae00\uc790 \uc5c6\uc74c`,
+          }),
+        );
+      }
+
+      for (let index = 0; index < savedCuts.length; index += 1) {
+        setGenerationMessage(`${index + 1}/${total} ${labels.onePassProgressSuffix}`);
+        await generateImageForCut(savedCuts[index]);
+      }
+
+      setGenerationState("done");
+      setGenerationMessage(labels.generationDone);
+    } catch (error) {
+      setGenerationState("error");
+      setGenerationMessage(getClientImageGenerationErrorMessage(error));
+    } finally {
+      generationInFlightRef.current = false;
+    }
+  }
+
   return (
     <section className="split-layout workspace-layout" aria-label={labels.workbenchAria}>
       <ProjectRail
@@ -697,13 +951,16 @@ export function StudioWorkbench({ initialProjectId }: StudioWorkbenchProps) {
         exportState={exportState}
         fullScenario={fullScenario}
         generationState={generationState}
+        generationMessage={generationMessage}
         imageGenerationAssets={imageGenerationAssets}
+        onBuildCardNewsInOnePass={buildCardNewsInOnePass}
         onDecreaseCutCount={decreaseCutCount}
         onFlushSelectedCut={() => {
           if (selectedCut) {
             flushPendingCutPatch(selectedCut.id);
           }
         }}
+        onGenerateSelectedCutImage={generateSelectedCutImage}
         onFullScenarioChange={setFullScenario}
         onIncreaseCutCount={increaseCutCount}
         onSelectCut={selectCut}
@@ -864,11 +1121,14 @@ type ProductionPanelProps = {
   exportSettings: StudioExportSettings;
   exportState: ExportState;
   fullScenario: string;
+  generationMessage: string;
   generationState: GenerationState;
   imageGenerationAssets: ImageGenerationAssets;
+  onBuildCardNewsInOnePass: () => void;
   onDecreaseCutCount: () => void;
   onFlushSelectedCut: () => void;
   onFullScenarioChange: (value: string) => void;
+  onGenerateSelectedCutImage: () => void;
   onIncreaseCutCount: () => void;
   onSelectCut: (cutId: string) => void;
   onUpdateSelectedCut: (patch: UpdateCutInput) => void;
@@ -887,11 +1147,14 @@ function ProductionPanel({
   exportSettings,
   exportState,
   fullScenario,
+  generationMessage,
   generationState,
   imageGenerationAssets,
+  onBuildCardNewsInOnePass,
   onDecreaseCutCount,
   onFlushSelectedCut,
   onFullScenarioChange,
+  onGenerateSelectedCutImage,
   onIncreaseCutCount,
   onSelectCut,
   onUpdateSelectedCut,
@@ -931,7 +1194,12 @@ function ProductionPanel({
               value={fullScenario}
             />
           </label>
-          <button className="production-text-button" disabled type="button">
+          <button
+            className="production-text-button"
+            disabled={generationState === "generating" || cutLoadState === "loading"}
+            onClick={onBuildCardNewsInOnePass}
+            type="button"
+          >
             {labels.produceAll}
           </button>
         </section>
@@ -949,16 +1217,23 @@ function ProductionPanel({
         />
 
         <CutEditor
+          generationState={generationState}
+          onGenerateSelectedCutImage={onGenerateSelectedCutImage}
           onFlushSelectedCut={onFlushSelectedCut}
           onUpdateSelectedCut={onUpdateSelectedCut}
           selectedCut={selectedCut}
         />
       </section>
 
-      <p className="save-state">
+      <p className={`save-state save-state-${getStatusMessageClass(saveState, generationState)}`}>
         {labels.generation}: {getGenerationLabel(generationState)} - {labels.export}:{" "}
         {getExportLabel(exportState)}
       </p>
+      {generationMessage ? (
+        <p className={`generation-message save-state-${getStatusMessageClass(saveState, generationState)}`}>
+          {generationMessage}
+        </p>
+      ) : null}
       <p className="sr-only">
         {labels.assetSummary} {imageGenerationAssets.characters.length}
         {labels.assetCountSuffix}, {labels.exportScale} {exportSettings.exportScale}
@@ -1040,12 +1315,20 @@ function CutList({
 }
 
 type CutEditorProps = {
+  generationState: GenerationState;
+  onGenerateSelectedCutImage: () => void;
   onFlushSelectedCut: () => void;
   onUpdateSelectedCut: (patch: UpdateCutInput) => void;
   selectedCut: Cut | null;
 };
 
-function CutEditor({ onFlushSelectedCut, onUpdateSelectedCut, selectedCut }: CutEditorProps) {
+function CutEditor({
+  generationState,
+  onGenerateSelectedCutImage,
+  onFlushSelectedCut,
+  onUpdateSelectedCut,
+  selectedCut,
+}: CutEditorProps) {
   if (!selectedCut) {
     return (
       <div className="editor-panel production-editor">
@@ -1106,6 +1389,16 @@ function CutEditor({ onFlushSelectedCut, onUpdateSelectedCut, selectedCut }: Cut
           value={selectedCut.imagePrompt}
         />
       </label>
+
+      <div className="editor-action-row">
+        <Button
+          disabled={generationState === "generating"}
+          onClick={onGenerateSelectedCutImage}
+          type="button"
+        >
+          {labels.generateImage}
+        </Button>
+      </div>
     </div>
   );
 }
@@ -1188,4 +1481,127 @@ function getExportLabel(state: ExportState) {
   }
 
   return labels.waiting;
+}
+
+function splitScenario(text: string, count: number) {
+  const trimmed = text.trim();
+
+  if (count <= 0) {
+    return [];
+  }
+
+  if (!trimmed) {
+    return Array.from({ length: count }, () => "");
+  }
+
+  const paragraphs = trimmed
+    .split(/\n{2,}/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+  const sourceSegments =
+    paragraphs.length >= count
+      ? paragraphs
+      : trimmed
+          .split(/(?<=[.!?\u3002\uff01\uff1f])\s+|\n+/)
+          .map((item) => item.trim())
+          .filter(Boolean);
+
+  if (sourceSegments.length >= count) {
+    const segments = sourceSegments.slice(0, count);
+    const overflow = sourceSegments.slice(count).join(" ");
+
+    if (overflow) {
+      segments[count - 1] = `${segments[count - 1]} ${overflow}`.trim();
+    }
+
+    return segments;
+  }
+
+  const words = trimmed.split(/\s+/).filter(Boolean);
+
+  if (words.length >= count) {
+    const size = Math.ceil(words.length / count);
+    return Array.from({ length: count }, (_, index) =>
+      words.slice(index * size, (index + 1) * size).join(" ").trim(),
+    );
+  }
+
+  return Array.from({ length: count }, (_, index) => sourceSegments[index] ?? trimmed);
+}
+
+function limitExpressionReferences(assets: ImageGenerationAssets): ImageGenerationAssets {
+  return {
+    ...assets,
+    characters: assets.characters.map((character) => ({
+      ...character,
+      expressions:
+        character.id === assets.selectedCharacterId ? character.expressions.slice(0, 3) : [],
+    })),
+  };
+}
+
+function getImageGenerationErrorMessage(status: number, payload: ImageGenerationFailure | null) {
+  const detail = [payload?.status, payload?.message, payload?.error].filter(Boolean).join(" ");
+
+  if (status === 401 || status === 403) {
+    return labels.apiKeyError;
+  }
+
+  if (status === 429 || /RESOURCE_EXHAUSTED|quota/i.test(detail)) {
+    return labels.quotaError;
+  }
+
+  if (status === 400) {
+    return labels.badRequestError;
+  }
+
+  if (payload?.status === "NETWORK_ERROR" || /network/i.test(detail)) {
+    return labels.networkError;
+  }
+
+  if (status >= 500) {
+    return labels.serviceError;
+  }
+
+  return labels.generationFailed;
+}
+
+function getClientImageGenerationErrorMessage(error: unknown) {
+  if (!(error instanceof Error)) {
+    return labels.generationFailed;
+  }
+
+  const message = error.message.trim();
+  const knownKoreanMessages = new Set([
+    labels.missingApiKey,
+    labels.projectLoadError,
+    labels.saveCutError,
+    labels.apiKeyError,
+    labels.quotaError,
+    labels.badRequestError,
+    labels.serviceError,
+    labels.generationFailed,
+  ]);
+
+  if (knownKoreanMessages.has(message)) {
+    return message;
+  }
+
+  return labels.networkError;
+}
+
+function getStatusMessageClass(saveState: SaveState, generationStatus: GenerationState) {
+  if (generationStatus === "generating") {
+    return "saving";
+  }
+
+  if (generationStatus === "done") {
+    return "saved";
+  }
+
+  if (generationStatus === "error") {
+    return "error";
+  }
+
+  return saveState;
 }
