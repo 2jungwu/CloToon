@@ -1,6 +1,16 @@
 "use client";
 
+import type { FormEvent, ReactNode } from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import type { Cut, CutImageStatus } from "@/lib/cuts/types";
 import type { ImageGenerationAssets } from "@/lib/image-generation/types";
 import type { CanvasPreset, ContentType, Project } from "@/lib/projects/types";
@@ -19,6 +29,10 @@ type ProjectsResponse = {
   projects: Project[];
 };
 
+type CreateProjectResponse = {
+  project: Project;
+};
+
 type CutsResponse = {
   cuts: Cut[];
 };
@@ -28,6 +42,16 @@ const labels = {
   workbench: "\uc6cc\ud06c\ubca4\uce58",
   workbenchAria: "\uc2a4\ud29c\ub514\uc624 \uc6cc\ud06c\ubca4\uce58",
   projectList: "\ud504\ub85c\uc81d\ud2b8 \ubaa9\ub85d",
+  projectName: "\ud504\ub85c\uc81d\ud2b8 \uc774\ub984",
+  projectNamePlaceholder: "\uc608: 5\uc6d4 \uce74\ub4dc\ub274\uc2a4 \uae30\ud68d",
+  contentType: "\ucf58\ud150\uce20 \uc720\ud615",
+  canvas: "\uce94\ubc84\uc2a4",
+  addProject: "\ud504\ub85c\uc81d\ud2b8 \ucd94\uac00",
+  addingProject: "\ucd94\uac00 \uc911...",
+  deleteProject: "\uc0ad\uc81c",
+  createProjectError: "\ud504\ub85c\uc81d\ud2b8\ub97c \ucd94\uac00\ud558\uc9c0 \ubabb\ud588\uc2b5\ub2c8\ub2e4.",
+  deleteProjectError: "\ud504\ub85c\uc81d\ud2b8\ub97c \uc0ad\uc81c\ud558\uc9c0 \ubabb\ud588\uc2b5\ub2c8\ub2e4.",
+  confirmDeleteProject: "\uc774 \ud504\ub85c\uc81d\ud2b8\ub97c \uc0ad\uc81c\ud560\uae4c\uc694?",
   cutList: "\ucef7 \ubaa9\ub85d",
   selectedProjectArea: "\uc120\ud0dd\ud55c \ud504\ub85c\uc81d\ud2b8 \uc791\uc5c5 \uc601\uc5ed",
   selectProject: "\ud504\ub85c\uc81d\ud2b8\ub97c \uc120\ud0dd\ud558\uc138\uc694",
@@ -73,6 +97,12 @@ const contentTypeLabels: Record<ContentType, string> = {
   "card-news": labels.cardNews,
 };
 
+const canvasPresetLabels: Record<CanvasPreset, string> = {
+  "1:1": "1:1",
+  "4:5": "4:5",
+  "9:16": "9:16",
+};
+
 const cutImageStatusLabels: Record<CutImageStatus, string> = {
   empty: "\uc774\ubbf8\uc9c0 \uc5c6\uc74c",
   mock: "\ubaa9\uc5c5 \uc774\ubbf8\uc9c0",
@@ -104,6 +134,12 @@ export function StudioWorkbench({ initialProjectId }: StudioWorkbenchProps) {
   const [projectName, setProjectName] = useState("");
   const [contentType, setContentType] = useState<ContentType>("comic");
   const [canvasPreset, setCanvasPreset] = useState<CanvasPreset>("1:1");
+  const [newProjectName, setNewProjectName] = useState("");
+  const [newContentType, setNewContentType] = useState<ContentType>("comic");
+  const [newCanvasPreset, setNewCanvasPreset] = useState<CanvasPreset>("1:1");
+  const [projectActionError, setProjectActionError] = useState<string | null>(null);
+  const [creatingProject, setCreatingProject] = useState(false);
+  const [deletingProjectId, setDeletingProjectId] = useState("");
   const [fullScenario, setFullScenario] = useState("");
   const [projectLoadState, setProjectLoadState] = useState<LoadState>("idle");
   const [cutLoadState, setCutLoadState] = useState<LoadState>("idle");
@@ -113,6 +149,8 @@ export function StudioWorkbench({ initialProjectId }: StudioWorkbenchProps) {
   const [imageGenerationAssets] = useState<ImageGenerationAssets>(emptyImageGenerationAssets);
   const [exportSettings] = useState<StudioExportSettings>(defaultExportSettings);
   const cutRequestIdRef = useRef(0);
+  const projectRequestIdRef = useRef(0);
+  const projectsRef = useRef<Project[]>([]);
   const selectedProjectIdRef = useRef(initialProjectId ?? "");
 
   const selectedProject = useMemo(
@@ -164,6 +202,8 @@ export function StudioWorkbench({ initialProjectId }: StudioWorkbenchProps) {
   }, []);
 
   const loadProjects = useCallback(async () => {
+    const requestId = projectRequestIdRef.current + 1;
+    projectRequestIdRef.current = requestId;
     setProjectLoadState("loading");
 
     try {
@@ -175,6 +215,11 @@ export function StudioWorkbench({ initialProjectId }: StudioWorkbenchProps) {
 
       const payload = (await response.json()) as ProjectsResponse;
       const loadedProjects = payload.projects;
+
+      if (requestId !== projectRequestIdRef.current) {
+        return;
+      }
+
       const preferredProject =
         (initialProjectId
           ? loadedProjects.find((project) => project.id === initialProjectId)
@@ -182,6 +227,7 @@ export function StudioWorkbench({ initialProjectId }: StudioWorkbenchProps) {
         loadedProjects[0] ??
         null;
 
+      projectsRef.current = loadedProjects;
       setProjects(loadedProjects);
       setSelectedProjectId(preferredProject?.id ?? "");
       selectedProjectIdRef.current = preferredProject?.id ?? "";
@@ -198,6 +244,11 @@ export function StudioWorkbench({ initialProjectId }: StudioWorkbenchProps) {
         setSelectedCutId("");
       }
     } catch {
+      if (requestId !== projectRequestIdRef.current) {
+        return;
+      }
+
+      projectsRef.current = [];
       setProjects([]);
       setSelectedProjectId("");
       selectedProjectIdRef.current = "";
@@ -235,48 +286,151 @@ export function StudioWorkbench({ initialProjectId }: StudioWorkbenchProps) {
     setCanvasPreset(project.canvasPreset);
   }
 
+  function clearSelectedProject() {
+    setSelectedProjectId("");
+    selectedProjectIdRef.current = "";
+    setProjectDetails(null);
+    cutRequestIdRef.current += 1;
+    setCuts([]);
+    setSelectedCutId("");
+    setCutLoadState("idle");
+  }
+
+  function selectProject(project: Project) {
+    projectRequestIdRef.current += 1;
+    setSelectedProjectId(project.id);
+    selectedProjectIdRef.current = project.id;
+    setProjectDetails(project);
+    setProjectLoadState("ready");
+    setCuts([]);
+    setSelectedCutId("");
+    void loadCuts(project.id);
+  }
+
   function handleProjectSelect(projectId: string) {
     const project = projects.find((item) => item.id === projectId) ?? null;
 
-    setSelectedProjectId(projectId);
-    selectedProjectIdRef.current = projectId;
-    setProjectDetails(project);
-    setCuts([]);
-    setSelectedCutId("");
-    void loadCuts(projectId);
+    if (project) {
+      selectProject(project);
+    }
+  }
+
+  async function createProject(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    const name = newProjectName.trim();
+
+    if (!name) {
+      return;
+    }
+
+    setCreatingProject(true);
+    setProjectActionError(null);
+
+    try {
+      const response = await fetch("/api/projects", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          name,
+          contentType: newContentType,
+          canvasPreset: newCanvasPreset,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Unable to create project.");
+      }
+
+      const payload = (await response.json()) as CreateProjectResponse;
+      const createdProject = payload.project;
+
+      projectRequestIdRef.current += 1;
+      setProjects((currentProjects) => {
+        const nextProjects = [createdProject, ...currentProjects];
+
+        projectsRef.current = nextProjects;
+        return nextProjects;
+      });
+      setNewProjectName("");
+      setProjectLoadState("ready");
+      selectProject(createdProject);
+    } catch {
+      setProjectActionError(labels.createProjectError);
+    } finally {
+      setCreatingProject(false);
+    }
+  }
+
+  async function deleteProject(project: Project) {
+    const confirmed = window.confirm(`${project.name}\n${labels.confirmDeleteProject}`);
+
+    if (!confirmed) {
+      return;
+    }
+
+    setDeletingProjectId(project.id);
+    setProjectActionError(null);
+
+    try {
+      const response = await fetch(`/api/projects/${project.id}`, {
+        method: "DELETE",
+      });
+
+      if (!response.ok) {
+        throw new Error("Unable to delete project.");
+      }
+
+      const currentProjects = projectsRef.current;
+      const deletedIndex = currentProjects.findIndex((item) => item.id === project.id);
+      const remainingProjects = currentProjects.filter((item) => item.id !== project.id);
+      const deletedProjectStillSelected = selectedProjectIdRef.current === project.id;
+      const nextSelectedProject = deletedProjectStillSelected
+        ? remainingProjects[deletedIndex] ?? remainingProjects[deletedIndex - 1]
+        : null;
+
+      projectRequestIdRef.current += 1;
+      setProjects((currentProjects) => {
+        const remainingProjects = currentProjects.filter((item) => item.id !== project.id);
+
+        projectsRef.current = remainingProjects;
+        return remainingProjects;
+      });
+      setProjectLoadState("ready");
+
+      if (remainingProjects.length === 0 || (deletedProjectStillSelected && !nextSelectedProject)) {
+        clearSelectedProject();
+      } else if (nextSelectedProject) {
+        selectProject(nextSelectedProject);
+      }
+    } catch {
+      setProjectActionError(labels.deleteProjectError);
+    } finally {
+      setDeletingProjectId("");
+    }
   }
 
   return (
     <section className="split-layout workspace-layout" aria-label={labels.workbenchAria}>
-      <aside className="split-menu workspace-menu" aria-label={labels.projectList}>
-        <div className="storyboard-info">
-          <p className="eyebrow">Studio</p>
-          <h1 className="sr-only">{labels.studio}</h1>
-          <p className="save-state">{getProjectLoadMessage(projectLoadState, projects.length)}</p>
-        </div>
-
-        <div className="split-menu-list">
-          {projects.map((project) => {
-            const active = project.id === selectedProjectId;
-
-            return (
-              <button
-                aria-current={active ? "page" : undefined}
-                className="split-menu-item project-menu-item"
-                data-active={active}
-                key={project.id}
-                onClick={() => handleProjectSelect(project.id)}
-                type="button"
-              >
-                <span>{project.name}</span>
-                <small>
-                  {contentTypeLabels[project.contentType]} - {project.canvasPreset}
-                </small>
-              </button>
-            );
-          })}
-        </div>
-      </aside>
+      <ProjectRail
+        canvasPreset={newCanvasPreset}
+        contentType={newContentType}
+        creatingProject={creatingProject}
+        deletingProjectId={deletingProjectId}
+        error={projectActionError}
+        name={newProjectName}
+        onCanvasPresetChange={setNewCanvasPreset}
+        onContentTypeChange={setNewContentType}
+        onCreateProject={createProject}
+        onDeleteProject={deleteProject}
+        onNameChange={setNewProjectName}
+        onProjectSelect={handleProjectSelect}
+        projectLoadState={projectLoadState}
+        projects={projects}
+        selectedProjectId={selectedProjectId}
+      />
 
       <div className="split-content">
         <div className="panel-heading">
@@ -383,6 +537,144 @@ export function StudioWorkbench({ initialProjectId }: StudioWorkbenchProps) {
         </section>
       </div>
     </section>
+  );
+}
+
+type StudioChipProps = {
+  children: ReactNode;
+};
+
+function StudioChip({ children }: StudioChipProps) {
+  return <span className="studio-chip">{children}</span>;
+}
+
+type ProjectRailProps = {
+  canvasPreset: CanvasPreset;
+  contentType: ContentType;
+  creatingProject: boolean;
+  deletingProjectId: string;
+  error: string | null;
+  name: string;
+  onCanvasPresetChange: (canvasPreset: CanvasPreset) => void;
+  onContentTypeChange: (contentType: ContentType) => void;
+  onCreateProject: (event: FormEvent<HTMLFormElement>) => void;
+  onDeleteProject: (project: Project) => void;
+  onNameChange: (name: string) => void;
+  onProjectSelect: (projectId: string) => void;
+  projectLoadState: LoadState;
+  projects: Project[];
+  selectedProjectId: string;
+};
+
+function ProjectRail({
+  canvasPreset,
+  contentType,
+  creatingProject,
+  deletingProjectId,
+  error,
+  name,
+  onCanvasPresetChange,
+  onContentTypeChange,
+  onCreateProject,
+  onDeleteProject,
+  onNameChange,
+  onProjectSelect,
+  projectLoadState,
+  projects,
+  selectedProjectId,
+}: ProjectRailProps) {
+  return (
+    <aside className="split-menu workspace-menu project-rail" aria-label={labels.projectList}>
+      <div className="storyboard-info">
+        <p className="eyebrow">{labels.studio}</p>
+        <h1 className="sr-only">{labels.studio}</h1>
+        <p className="save-state">{getProjectLoadMessage(projectLoadState, projects.length)}</p>
+      </div>
+
+      <form className="project-rail-form" onSubmit={onCreateProject}>
+        <label className="field-stack">
+          {labels.projectName}
+          <Input
+            aria-label={labels.projectName}
+            onChange={(event) => onNameChange(event.target.value)}
+            placeholder={labels.projectNamePlaceholder}
+            value={name}
+          />
+        </label>
+
+        <label className="field-stack">
+          {labels.contentType}
+          <Select value={contentType} onValueChange={(value) => onContentTypeChange(value as ContentType)}>
+            <SelectTrigger aria-label={labels.contentType}>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="comic">{labels.comic}</SelectItem>
+              <SelectItem value="card-news">{labels.cardNews}</SelectItem>
+            </SelectContent>
+          </Select>
+        </label>
+
+        <label className="field-stack">
+          {labels.canvas}
+          <Select
+            value={canvasPreset}
+            onValueChange={(value) => onCanvasPresetChange(value as CanvasPreset)}
+          >
+            <SelectTrigger aria-label={labels.canvas}>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="1:1">1:1</SelectItem>
+              <SelectItem value="4:5">4:5</SelectItem>
+              <SelectItem value="9:16">9:16</SelectItem>
+            </SelectContent>
+          </Select>
+        </label>
+
+        <Button disabled={creatingProject || name.trim().length === 0} type="submit">
+          {creatingProject ? labels.addingProject : labels.addProject}
+        </Button>
+
+        {error ? (
+          <p className="form-error" role="alert">
+            {error}
+          </p>
+        ) : null}
+      </form>
+
+      <div className="split-menu-list project-rail-list">
+        {projects.map((project) => {
+          const active = project.id === selectedProjectId;
+
+          return (
+            <div className="project-rail-row" data-active={active} key={project.id}>
+              <button
+                aria-current={active ? "page" : undefined}
+                className="split-menu-item project-menu-item"
+                onClick={() => onProjectSelect(project.id)}
+                type="button"
+              >
+                <span>{project.name}</span>
+                <span className="project-rail-meta">
+                  <StudioChip>{contentTypeLabels[project.contentType]}</StudioChip>
+                  <StudioChip>{canvasPresetLabels[project.canvasPreset]}</StudioChip>
+                </span>
+              </button>
+              <button
+                aria-label={`${project.name} ${labels.deleteProject}`}
+                className="project-row-delete"
+                disabled={deletingProjectId === project.id}
+                onClick={() => onDeleteProject(project)}
+                type="button"
+              >
+                {labels.deleteProject}
+              </button>
+            </div>
+          );
+        })}
+      </div>
+    </aside>
   );
 }
 
