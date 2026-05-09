@@ -169,6 +169,7 @@ body {
   color: var(--foreground);
   font-family: var(--font-sans);
   letter-spacing: 0;
+  overflow-x: clip;
 }
 
 a {
@@ -1110,7 +1111,7 @@ textarea::placeholder {
   align-items: stretch;
   border-radius: 8px;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr);
   position: relative;
   transition:
     background-color 160ms ease,
@@ -1130,7 +1131,7 @@ textarea::placeholder {
 .project-rail-row .project-menu-item {
   background: transparent;
   color: var(--app-text);
-  padding-right: 8px;
+  padding-right: 52px;
 }
 
 .project-rail-row .project-menu-item:hover,
@@ -1166,7 +1167,10 @@ textarea::placeholder {
   font-weight: 700;
   line-height: 1;
   min-height: 22px;
+  max-width: 100%;
+  overflow: hidden;
   padding: 0 8px;
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
 
@@ -1179,12 +1183,14 @@ textarea::placeholder {
   cursor: pointer;
   font-size: 12px;
   font-weight: 700;
-  justify-self: end;
-  margin-right: 8px;
+  inset-inline-end: 8px;
   min-height: 30px;
   opacity: 0;
   padding: 0 10px;
   pointer-events: none;
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
   transition:
     background-color 160ms ease,
     border-color 160ms ease,
@@ -1226,7 +1232,8 @@ textarea::placeholder {
 }
 
 .studio-workbench-layout {
-  grid-template-columns: minmax(220px, 280px) minmax(0, 1fr) minmax(280px, 360px);
+  gap: 32px;
+  grid-template-columns: minmax(240px, 280px) minmax(420px, 1fr) minmax(300px, 360px);
 }
 
 .workspace-menu {
@@ -1278,8 +1285,8 @@ textarea::placeholder {
 .production-detail-grid {
   align-items: start;
   display: grid;
-  gap: 40px;
-  grid-template-columns: minmax(220px, 300px) minmax(0, 1fr);
+  gap: 28px;
+  grid-template-columns: minmax(200px, 260px) minmax(0, 1fr);
 }
 
 .production-cut-list {
@@ -1528,6 +1535,7 @@ textarea::placeholder {
   line-height: 1.45;
   margin: 0;
   max-width: 76%;
+  overflow-wrap: anywhere;
 }
 
 .image-preview-art {
@@ -1791,14 +1799,40 @@ textarea::placeholder {
   }
 }
 
+@media (max-width: 1180px) {
+  .studio-workbench-layout {
+    gap: 28px;
+    grid-template-columns: minmax(220px, 280px) minmax(0, 1fr);
+  }
+
+  .studio-workbench-layout > .image-preview-panel {
+    grid-column: 2;
+  }
+
+  .production-detail-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .image-preview-panel .export-actions {
+    justify-content: flex-start;
+  }
+}
+
 @media (max-width: 992px) {
   .workspace-grid,
   .editor-grid,
   .workspace-detail-grid,
-  .production-detail-grid,
   .split-layout {
     grid-template-columns: 1fr;
     gap: 28px;
+  }
+
+  .studio-workbench-layout {
+    grid-template-columns: minmax(220px, 280px) minmax(0, 1fr);
+  }
+
+  .studio-workbench-layout > .image-preview-panel {
+    grid-column: 2;
   }
 
   .split-menu-list {
@@ -1807,6 +1841,42 @@ textarea::placeholder {
 
   .split-menu-item {
     font-size: 16px;
+  }
+}
+
+@media (max-width: 760px) {
+  .studio-workbench-layout,
+  .workspace-grid,
+  .editor-grid,
+  .workspace-detail-grid,
+  .production-detail-grid,
+  .split-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .studio-workbench-layout > .image-preview-panel {
+    grid-column: auto;
+  }
+
+  .split-menu-list {
+    grid-template-columns: 1fr;
+  }
+
+  .project-rail-row .project-menu-item {
+    padding-right: 58px;
+  }
+
+  .cut-count-stepper button {
+    height: 44px;
+    width: 44px;
+  }
+
+  .image-preview-panel .export-actions {
+    justify-content: stretch;
+  }
+
+  .image-preview-panel .export-actions [data-slot="button"] {
+    flex: 1 1 100%;
   }
 }
 
