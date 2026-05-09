@@ -11,7 +11,7 @@ This app generates only the visual image layer for each cut. Final Korean captio
 ## Prompt Rules
 
 - Use `gemini-3.1-flash-image-preview` as the default Gemini image model.
-- Request an image response from Gemini and include the project canvas preset in the prompt.
+- Request an image response from Gemini and pass the project canvas preset through the REST-compatible `generationConfig.imageConfig.aspectRatio` field.
 - Use the selected character markdown as the primary consistency reference.
 - Use character expression images only as visual references for expression and identity.
 - Use the default background prompt unless the cut image prompt clearly overrides it.
@@ -28,6 +28,7 @@ No readable text, captions, speech bubbles, Korean lettering, UI text, subtitles
 
 - Gemini API keys are not committed to source control and are not stored in the SQLite project database.
 - The browser reads the key from `local-studio-settings.geminiApiKey` and sends it only to the local Next API route for the current request.
+- Character expression images are sent only as bounded PNG/JPEG/WebP data URL references for the active generation request.
 - Runtime prompt assembly does not create intermediate markdown files.
 - Generated images are saved back to the selected cut as `imageDataUrl` with `imageStatus: "generated"`.
 

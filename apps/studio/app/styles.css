@@ -867,6 +867,7 @@ textarea::placeholder {
 .comic-caption {
   background: rgba(255, 255, 255, 0.96);
   border-top: 1px solid var(--export-border);
+  font-family: var(--cut-caption-font, var(--app-font-sans));
   font-size: 18px;
   font-weight: 700;
   line-height: 1.25;
@@ -878,6 +879,7 @@ textarea::placeholder {
   background: #fff;
   border: 2px solid var(--export-black);
   border-radius: 8px;
+  font-family: var(--cut-dialogue-font, var(--app-font-sans));
   font-size: 15px;
   font-weight: 700;
   left: 18px;
@@ -923,6 +925,7 @@ textarea::placeholder {
 }
 
 .card-copy strong {
+  font-family: var(--cut-caption-font, var(--app-font-sans));
   font-size: 24px;
   font-weight: 700;
   line-height: 1.16;
@@ -930,6 +933,7 @@ textarea::placeholder {
 
 .card-copy p {
   color: var(--export-gray-700);
+  font-family: var(--cut-dialogue-font, var(--app-font-sans));
   font-size: 15px;
   line-height: 1.45;
   margin: 0;

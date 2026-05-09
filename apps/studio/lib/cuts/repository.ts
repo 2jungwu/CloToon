@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { getDatabase } from "@/lib/db/database";
-import { getProject } from "@/lib/projects/repository";
+import { getProject, touchProject } from "@/lib/projects/repository";
 import type { CreateCutInput, Cut, UpdateCutInput } from "@/lib/cuts/types";
 
 type CutRow = {
@@ -92,6 +92,8 @@ export function createCut(input: CreateCutInput): Cut {
       cut.updatedAt,
     );
 
+  touchProject(input.projectId, now);
+
   return cut;
 }
 
@@ -136,6 +138,8 @@ export function updateCut(projectId: string, cutId: string, input: UpdateCutInpu
       cutId,
     );
 
+  touchProject(projectId, next.updatedAt);
+
   return next;
 }
 
@@ -166,6 +170,7 @@ export function deleteCut(projectId: string, cutId: string): boolean {
 
   if (result.changes > 0) {
     normalizePositions(projectId);
+    touchProject(projectId);
     return true;
   }
 
@@ -192,6 +197,8 @@ export function reorderCuts(projectId: string, cutIds: string[]): Cut[] {
       update.run(index + 1, now, projectId, cutId);
     });
   })();
+
+  touchProject(projectId, now);
 
   return listCuts(projectId);
 }

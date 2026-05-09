@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { deleteCut, updateCut } from "@/lib/cuts/repository";
+import { isAllowedCutImageDataUrl, maxCutImageDataUrlLength } from "@/lib/cuts/image-data-url";
 
 export const runtime = "nodejs";
 
@@ -18,7 +19,11 @@ const updateCutSchema = z.object({
   dialogue: z.string().max(2000).optional(),
   imagePrompt: z.string().max(4000).optional(),
   negativePrompt: z.string().max(2000).optional(),
-  imageDataUrl: z.string().max(8_000_000).optional(),
+  imageDataUrl: z
+    .string()
+    .max(maxCutImageDataUrlLength)
+    .refine(isAllowedCutImageDataUrl, "imageDataUrl must be an allowed image data URL.")
+    .optional(),
   imageStatus: z.enum(["empty", "mock", "uploaded", "generated", "failed"]).optional(),
 });
 

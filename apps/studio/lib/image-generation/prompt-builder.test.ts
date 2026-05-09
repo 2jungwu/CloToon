@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { buildImageGenerationPrompt } from "./prompt-builder";
+import { buildImageGenerationPrompt } from "./prompt-builder.ts";
 import type {
   ImageGenerationAssets,
   ImageGenerationCut,

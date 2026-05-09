@@ -11,6 +11,7 @@
     "build": "npm --workspace @local-comic-card-studio/studio run build",
     "start": "npm --workspace @local-comic-card-studio/studio run start",
     "lint": "npm --workspace @local-comic-card-studio/studio run lint",
+    "test": "npm --workspace @local-comic-card-studio/studio run test",
     "typecheck": "npm --workspace @local-comic-card-studio/studio run typecheck"
   }
 }

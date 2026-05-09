@@ -1,4 +1,5 @@
 import type { ImageGenerationAssets, ImageGenerationCharacter } from "@/lib/image-generation/types";
+import { isAllowedReferenceImageDataUrl } from "@/lib/cuts/image-data-url";
 
 export const assetsStorageKey = "local-studio-assets";
 export const settingsStorageKey = "local-studio-settings";
@@ -123,7 +124,7 @@ function normalizeExpressions(value: unknown) {
       }
 
       const dataUrl = getString(item.dataUrl, "");
-      if (!dataUrl.startsWith("data:image/")) {
+      if (!isAllowedReferenceImageDataUrl(dataUrl)) {
         return null;
       }
 

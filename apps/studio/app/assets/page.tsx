@@ -19,6 +19,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { isAllowedReferenceImageDataUrl } from "@/lib/cuts/image-data-url";
+import { assetsStorageKey, settingsStorageKey } from "@/lib/image-generation/storage";
 
 type AssetSection = "characters" | "background" | "fonts" | "api-key" | "export";
 
@@ -56,9 +58,6 @@ type StudioSettings = {
   exportScale: "1080" | "2160";
   saveOriginalHtml: boolean;
 };
-
-const assetsStorageKey = "local-studio-assets";
-const settingsStorageKey = "local-studio-settings";
 
 const menuItems: { id: AssetSection; label: string }[] = [
   { id: "characters", label: "캐릭터" },
@@ -194,14 +193,25 @@ function AssetsClient({
     }
 
     const images = await Promise.all(
-      Array.from(files).map(async (file) => ({
-        id: createId("expression"),
-        name: file.name,
-        dataUrl: await readFileAsDataUrl(file),
-      })),
+      Array.from(files).map(async (file) => {
+        const dataUrl = await readFileAsDataUrl(file);
+
+        return isAllowedReferenceImageDataUrl(dataUrl)
+          ? {
+              id: createId("expression"),
+              name: file.name,
+              dataUrl,
+            }
+          : null;
+      }),
     );
 
-    updateSelectedCharacter({ expressions: [...selectedCharacter.expressions, ...images] });
+    updateSelectedCharacter({
+      expressions: [
+        ...selectedCharacter.expressions,
+        ...images.filter((image): image is ExpressionImage => image !== null),
+      ],
+    });
   }
 
   function deleteExpression(expressionId: string) {
@@ -914,7 +924,7 @@ function normalizeExpressions(value: unknown): ExpressionImage[] {
 
       const dataUrl = getString(item.dataUrl, "");
 
-      if (!dataUrl) {
+      if (!isAllowedReferenceImageDataUrl(dataUrl)) {
         return null;
       }
 

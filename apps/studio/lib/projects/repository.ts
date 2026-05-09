@@ -82,6 +82,14 @@ export function deleteProject(id: string): boolean {
   return changes > 0;
 }
 
+export function touchProject(id: string, updatedAt = new Date().toISOString()): boolean {
+  const result = getDatabase()
+    .prepare(`UPDATE projects SET updated_at = ? WHERE id = ?`)
+    .run(updatedAt, id);
+
+  return result.changes > 0;
+}
+
 function toProject(row: ProjectRow): Project {
   return {
     id: row.id,

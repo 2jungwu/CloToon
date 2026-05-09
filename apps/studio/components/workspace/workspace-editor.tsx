@@ -24,6 +24,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { isAllowedCutImageDataUrl, toCssImageUrl } from "@/lib/cuts/image-data-url";
 import type { Cut, CutImageStatus, CutTemplate } from "@/lib/cuts/types";
 import {
   loadGeminiApiKeyFromStorage,
@@ -31,6 +32,12 @@ import {
 } from "@/lib/image-generation/storage";
 import type { ImageGenerationAssets } from "@/lib/image-generation/types";
 import type { Project } from "@/lib/projects/types";
+import {
+  defaultStudioPreferences,
+  getExportPixelRatio,
+  loadStudioPreferencesFromStorage,
+  type StudioFonts,
+} from "@/lib/studio-preferences";
 
 type WorkspaceEditorProps = {
   project: Project;
@@ -77,6 +84,11 @@ export function WorkspaceEditor({ project, initialCuts }: WorkspaceEditorProps) 
     status: "idle",
     message: "",
   });
+  const [studioPreferences, setStudioPreferences] = useState(() =>
+    typeof window === "undefined"
+      ? defaultStudioPreferences
+      : loadStudioPreferencesFromStorage(window.localStorage),
+  );
   const [exportState, setExportState] = useState<"idle" | "exporting" | "done" | "error">("idle");
   const exportRootRef = useRef<HTMLDivElement | null>(null);
 
@@ -131,6 +143,8 @@ export function WorkspaceEditor({ project, initialCuts }: WorkspaceEditorProps) 
   }
 
   async function duplicateCut(cut: Cut) {
+    await persistCutPatch(cut, getEditableCutPatch(cut));
+
     const response = await fetch(`/api/projects/${project.id}/cuts`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -240,6 +254,7 @@ export function WorkspaceEditor({ project, initialCuts }: WorkspaceEditorProps) 
     }
 
     await persistCutPatch(selectedCut, {
+      ...getEditableCutPatch(selectedCut),
       imageDataUrl: createMockImageDataUrl(selectedCut, project),
       imageStatus: "mock",
     });
@@ -252,7 +267,16 @@ export function WorkspaceEditor({ project, initialCuts }: WorkspaceEditorProps) 
 
     const dataUrl = await readFileAsDataUrl(file);
     setGenerationState({ status: "idle", message: "" });
+    if (!isAllowedCutImageDataUrl(dataUrl)) {
+      setGenerationState({
+        status: "error",
+        message: "PNG, JPEG, WebP 이미지만 업로드할 수 있으며 파일 크기를 줄여야 합니다.",
+      });
+      return;
+    }
+
     await persistCutPatch(selectedCut, {
+      ...getEditableCutPatch(selectedCut),
       imageDataUrl: dataUrl,
       imageStatus: "uploaded",
     });
@@ -279,13 +303,7 @@ export function WorkspaceEditor({ project, initialCuts }: WorkspaceEditorProps) 
     try {
       const assets = limitExpressionReferences(loadImageGenerationAssetsFromStorage(window.localStorage));
       savedCut = await persistCutPatch(selectedCut, {
-        template: selectedCut.template,
-        position: selectedCut.position,
-        scenario: selectedCut.scenario,
-        caption: selectedCut.caption,
-        dialogue: selectedCut.dialogue,
-        imagePrompt: selectedCut.imagePrompt,
-        negativePrompt: selectedCut.negativePrompt,
+        ...getEditableCutPatch(selectedCut),
         imageDataUrl: selectedCut.imageDataUrl,
         imageStatus: selectedCut.imageStatus,
       });
@@ -349,13 +367,20 @@ export function WorkspaceEditor({ project, initialCuts }: WorkspaceEditorProps) 
 
     setExportState("exporting");
     try {
+      const preferences = loadStudioPreferencesFromStorage(window.localStorage);
+      setStudioPreferences(preferences);
+      applyExportFontVariables(exportRootRef.current, preferences.fonts);
       const node = exportRootRef.current.querySelector<HTMLElement>(
         `[data-export-cut-id="${selectedCut.id}"]`,
       );
       if (!node) {
         throw new Error("내보낼 컷을 찾지 못했습니다.");
       }
-      const dataUrl = await toPng(node, { cacheBust: true, pixelRatio: 1, backgroundColor: "#ffffff" });
+      const dataUrl = await toPng(node, {
+        cacheBust: true,
+        pixelRatio: getExportPixelRatio(preferences.export),
+        backgroundColor: "#ffffff",
+      });
       downloadDataUrl(dataUrl, `${safeFileName(project.name)}-cut-${selectedCut.position}.png`);
       setExportState("done");
     } catch {
@@ -370,6 +395,9 @@ export function WorkspaceEditor({ project, initialCuts }: WorkspaceEditorProps) 
 
     setExportState("exporting");
     try {
+      const preferences = loadStudioPreferencesFromStorage(window.localStorage);
+      setStudioPreferences(preferences);
+      applyExportFontVariables(exportRootRef.current, preferences.fonts);
       const zip = new JSZip();
       const sortedCuts = [...cuts].sort((a, b) => a.position - b.position);
 
@@ -383,10 +411,17 @@ export function WorkspaceEditor({ project, initialCuts }: WorkspaceEditorProps) 
 
         const dataUrl = await toPng(node, {
           cacheBust: true,
-          pixelRatio: 1,
+          pixelRatio: getExportPixelRatio(preferences.export),
           backgroundColor: "#ffffff",
         });
         zip.file(`cut-${String(cut.position).padStart(2, "0")}.png`, dataUrlToBlob(dataUrl));
+
+        if (preferences.export.saveOriginalHtml) {
+          zip.file(
+            `cut-${String(cut.position).padStart(2, "0")}.html`,
+            createCutHtmlDocument(node, project, cut),
+          );
+        }
       }
 
       const blob = await zip.generateAsync({ type: "blob" });
@@ -599,7 +634,9 @@ export function WorkspaceEditor({ project, initialCuts }: WorkspaceEditorProps) 
                 <Badge className="badge-canvas">{project.canvasPreset}</Badge>
               </div>
 
-              {selectedCut ? <CutPreview cut={selectedCut} project={project} /> : null}
+              {selectedCut ? (
+                <CutPreview cut={selectedCut} project={project} fonts={studioPreferences.fonts} />
+              ) : null}
 
               <div className="toolbar-row export-actions">
                 <Button type="button" onClick={downloadCurrentCut}>
@@ -621,14 +658,30 @@ export function WorkspaceEditor({ project, initialCuts }: WorkspaceEditorProps) 
 
       <div className="export-stack" ref={exportRootRef} aria-hidden>
         {sortedCuts.map((cut) => (
-          <CutPreview key={cut.id} cut={cut} project={project} exportId={cut.id} />
+          <CutPreview
+            key={cut.id}
+            cut={cut}
+            project={project}
+            exportId={cut.id}
+            fonts={studioPreferences.fonts}
+          />
         ))}
       </div>
     </>
   );
 }
 
-function CutPreview({ cut, project, exportId }: { cut: Cut; project: Project; exportId?: string }) {
+function CutPreview({
+  cut,
+  project,
+  exportId,
+  fonts,
+}: {
+  cut: Cut;
+  project: Project;
+  exportId?: string;
+  fonts: StudioFonts;
+}) {
   const ratioClass =
     project.canvasPreset === "9:16"
       ? "canvas-9-16"
@@ -636,6 +689,8 @@ function CutPreview({ cut, project, exportId }: { cut: Cut; project: Project; ex
         ? "canvas-4-5"
         : "canvas-1-1";
   const templateClass = cut.template === "card-news" ? "card-news" : "comic";
+  const cssImageUrl = toCssImageUrl(cut.imageDataUrl);
+  const hasImage = cssImageUrl !== "none";
 
   return (
     <article
@@ -643,12 +698,14 @@ function CutPreview({ cut, project, exportId }: { cut: Cut; project: Project; ex
       data-export-cut-id={exportId}
       style={
         {
-          "--cut-image": cut.imageDataUrl ? `url(${cut.imageDataUrl})` : "none",
+          "--cut-image": cssImageUrl,
+          "--cut-caption-font": fonts.subtitle,
+          "--cut-dialogue-font": fonts.dialogue,
         } as CSSProperties
       }
     >
-      <div className={cut.imageDataUrl ? "cut-art-layer has-image" : "cut-art-layer"}>
-        {!cut.imageDataUrl ? (
+      <div className={hasImage ? "cut-art-layer has-image" : "cut-art-layer"}>
+        {!hasImage ? (
           <div className="art-placeholder">
             <span>{cut.imagePrompt || "이미지 프롬프트를 입력하세요."}</span>
           </div>
@@ -667,6 +724,24 @@ function CutPreview({ cut, project, exportId }: { cut: Cut; project: Project; ex
       )}
     </article>
   );
+}
+
+function getEditableCutPatch(cut: Cut) {
+  return {
+    template: cut.template,
+    scenario: cut.scenario,
+    caption: cut.caption,
+    dialogue: cut.dialogue,
+    imagePrompt: cut.imagePrompt,
+    negativePrompt: cut.negativePrompt,
+  };
+}
+
+function applyExportFontVariables(root: HTMLElement | null, fonts: StudioFonts) {
+  root?.querySelectorAll<HTMLElement>(".cut-canvas").forEach((node) => {
+    node.style.setProperty("--cut-caption-font", fonts.subtitle);
+    node.style.setProperty("--cut-dialogue-font", fonts.dialogue);
+  });
 }
 
 function splitScenario(text: string, count: number) {
@@ -801,8 +876,32 @@ function dataUrlToBlob(dataUrl: string) {
   return new Blob([bytes], { type: mime });
 }
 
+function createCutHtmlDocument(node: HTMLElement, project: Project, cut: Cut) {
+  return [
+    "<!doctype html>",
+    '<html lang="ko">',
+    "<head>",
+    '<meta charset="utf-8" />',
+    '<meta name="viewport" content="width=device-width, initial-scale=1" />',
+    `<title>${escapeHtml(project.name)} - Cut ${cut.position}</title>`,
+    "</head>",
+    "<body>",
+    node.outerHTML,
+    "</body>",
+    "</html>",
+  ].join("\n");
+}
+
 function safeFileName(value: string) {
   return value.replace(/[\\/:*?"<>|]/g, "-").trim() || "local-studio";
+}
+
+function escapeHtml(value: string) {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
 }
 
 function escapeXml(value: string) {
