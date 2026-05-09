@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 const navItems = [
-  { href: "/projects", label: "Projects", activePrefixes: ["/projects", "/workspace"] },
+  { href: "/projects", label: "Studio", activePrefixes: ["/projects", "/workspace"] },
   { href: "/assets", label: "Assets", activePrefixes: ["/assets", "/settings"] },
 ];
 
