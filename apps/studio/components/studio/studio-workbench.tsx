@@ -88,6 +88,8 @@ const labels = {
   selectProject: "\ud504\ub85c\uc81d\ud2b8\ub97c \uc120\ud0dd\ud558\uc138\uc694",
   selectProjectHelp: "\uc67c\ucabd \ubaa9\ub85d\uc5d0\uc11c \uc791\uc5c5\ud560 \ud504\ub85c\uc81d\ud2b8\ub97c \uc120\ud0dd\ud558\uc138\uc694.",
   cutCount: "\ucef7 \uc218",
+  decreaseCutCount: "\ucef7 \uc218 \uc904\uc774\uae30",
+  increaseCutCount: "\ucef7 \uc218 \ub298\ub9ac\uae30",
   status: "\uc0c1\ud0dc",
   noContent: "\ub0b4\uc6a9 \uc5c6\uc74c",
   selectedCut: "\uc120\ud0dd\ud55c \ucef7",
@@ -1543,7 +1545,7 @@ function CutList({
           <span>{labels.cutCount}</span>
           <div>
             <button
-              aria-label="\ucef7 \uc218 \uc904\uc774\uae30"
+              aria-label={labels.decreaseCutCount}
               disabled={cuts.length === 0}
               onClick={onDecreaseCutCount}
               type="button"
@@ -1552,7 +1554,7 @@ function CutList({
             </button>
             <strong>{cuts.length}</strong>
             <button
-              aria-label="\ucef7 \uc218 \ub298\ub9ac\uae30"
+              aria-label={labels.increaseCutCount}
               disabled={!canIncreaseCutCount}
               onClick={onIncreaseCutCount}
               type="button"
@@ -1853,7 +1855,7 @@ function getSaveLabel(state: SaveState) {
     return labels.saveError;
   }
 
-  return labels.shell;
+  return labels.waiting;
 }
 
 function getGenerationLabel(state: GenerationState) {
