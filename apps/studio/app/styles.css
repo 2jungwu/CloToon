@@ -1525,8 +1525,13 @@ textarea::placeholder {
   align-content: start;
 }
 
-.production-editor {
+.studio-workbench-shell .editor-panel.production-editor {
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
   gap: 18px;
+  padding: 0;
 }
 
 .editor-action-row {
