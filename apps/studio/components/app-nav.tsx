@@ -40,7 +40,7 @@ export function AppNav() {
 
         return (
           <Link
-            aria-current={active ? "page" : undefined}
+            aria-current={pathname === item.href ? "page" : undefined}
             className="app-side-link"
             data-active={active}
             href={item.href}
