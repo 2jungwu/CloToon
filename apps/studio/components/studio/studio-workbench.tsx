@@ -17,6 +17,7 @@ import { toCssImageUrl } from "@/lib/cuts/image-data-url";
 import type { Cut, CutTemplate, UpdateCutInput } from "@/lib/cuts/types";
 import {
   loadGeminiApiKeyFromStorage,
+  loadGeminiImageModelFromStorage,
   loadImageGenerationAssetsFromStorage,
 } from "@/lib/image-generation/storage";
 import type { ImageGenerationAssets } from "@/lib/image-generation/types";
@@ -68,7 +69,7 @@ type ImageGenerationFailure = {
 
 const labels = {
   studio: "\uc2a4\ud29c\ub514\uc624",
-  workbench: "\uc6cc\ud06c\ubca4\uce58",
+  workbench: "\ud504\ub85c\uc81d\ud2b8",
   workbenchAria: "\uc2a4\ud29c\ub514\uc624 \uc6cc\ud06c\ubca4\uce58",
   projectsTitle: "\ud504\ub85c\uc81d\ud2b8",
   projectListTitle: "\ud504\ub85c\uc81d\ud2b8 \ubaa9\ub85d",
@@ -915,6 +916,7 @@ export function StudioWorkbench({ initialProjectId }: StudioWorkbenchProps) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           apiKey,
+          model: loadGeminiImageModelFromStorage(window.localStorage),
           project: {
             id: project.id,
             name: project.name,
@@ -1357,6 +1359,7 @@ function ProjectDrawer({
                 type="button"
               >
                 <span>{project.name}</span>
+                <small>{formatProjectCreatedAt(project.createdAt)}</small>
                 <span className="project-drawer-meta">
                   <StudioChip>{contentTypeLabels[project.contentType]}</StudioChip>
                   <StudioChip>{canvasPresetLabels[project.canvasPreset]}</StudioChip>
@@ -1956,6 +1959,19 @@ function getSaveLabel(state: SaveState) {
   }
 
   return labels.waiting;
+}
+
+function formatProjectCreatedAt(value: string) {
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return "";
+  }
+
+  return new Intl.DateTimeFormat("ko-KR", {
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(date);
 }
 
 function getGenerationLabel(state: GenerationState) {

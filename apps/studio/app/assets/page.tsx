@@ -21,6 +21,12 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { isAllowedReferenceImageDataUrl } from "@/lib/cuts/image-data-url";
 import { assetsStorageKey, settingsStorageKey } from "@/lib/image-generation/storage";
+import {
+  defaultGeminiImageModel,
+  geminiImageModels,
+  normalizeGeminiImageModel,
+  type GeminiImageModel,
+} from "@/lib/image-generation/models";
 
 type AssetSection = "characters" | "background" | "fonts" | "api-key" | "export";
 
@@ -55,6 +61,7 @@ type StudioAssets = {
 type StudioSettings = {
   provider: "gemini";
   geminiApiKey: string;
+  geminiModel: GeminiImageModel;
   exportScale: "1080" | "2160";
   saveOriginalHtml: boolean;
 };
@@ -63,7 +70,7 @@ const menuItems: { id: AssetSection; label: string }[] = [
   { id: "characters", label: "캐릭터" },
   { id: "background", label: "배경" },
   { id: "fonts", label: "폰트" },
-  { id: "api-key", label: "API Key" },
+  { id: "api-key", label: "API" },
   { id: "export", label: "내보내기" },
 ];
 
@@ -225,7 +232,7 @@ function AssetsClient({
       <div className="page-heading">
         <p className="eyebrow">Assets</p>
         <h1>에셋 설정</h1>
-        <p>캐릭터, 배경, 폰트, API Key, 내보내기 옵션을 로컬에 저장합니다.</p>
+        <p>캐릭터, 배경, 폰트, API, 내보내기 옵션을 로컬에 저장합니다.</p>
       </div>
 
       <div className="split-layout asset-layout">
@@ -357,7 +364,6 @@ function CharacterPanel({
     <>
       <div className="panel-heading">
         <div>
-          <p className="eyebrow">Character</p>
           <h2>캐릭터</h2>
         </div>
         <Button onClick={onAddCharacter} type="button" variant="secondary">
@@ -378,8 +384,11 @@ function CharacterPanel({
                 onClick={() => onSelectCharacter(character.id)}
                 type="button"
               >
-                <strong>{character.name}</strong>
-                <span>캐릭터 표정 {character.expressions.length}개</span>
+                <span className="character-disclosure-title">{character.name}</span>
+                <span className="character-disclosure-meta">
+                  캐릭터 표정 {character.expressions.length}개
+                  <span aria-hidden className="character-disclosure-chevron" />
+                </span>
               </button>
 
               {expanded ? (
@@ -479,7 +488,6 @@ function BackgroundPanel({
     <>
       <div className="panel-heading">
         <div>
-          <p className="eyebrow">Background</p>
           <h2>배경 설정</h2>
           <p>컷 생성에 참고할 배경 이름, 프롬프트, 색상을 저장합니다.</p>
         </div>
@@ -513,7 +521,6 @@ function BackgroundPanel({
 
       <div className="asset-preview" style={{ background: assets.background.color }}>
         <strong>{assets.background.name}</strong>
-        <span>{assets.background.prompt}</span>
       </div>
 
       <SaveRow onSave={onSave} saved={saveState === "assets"} />
@@ -536,7 +543,6 @@ function FontsPanel({
     <>
       <div className="panel-heading">
         <div>
-          <p className="eyebrow">Fonts</p>
           <h2>폰트 설정</h2>
           <p>HTML 미리보기와 내보내기에서 사용할 자막/대사 폰트를 관리합니다.</p>
         </div>
@@ -588,9 +594,8 @@ function ApiKeyPanel({
     <>
       <div className="panel-heading">
         <div>
-          <p className="eyebrow">API Key</p>
-          <h2>API Key 등록</h2>
-          <p>이미지 생성에 사용할 Gemini API Key를 브라우저 로컬 저장소에 저장합니다.</p>
+          <h2>API 등록</h2>
+          <p>이미지 생성에 사용할 Gemini API Key와 호출 모델을 브라우저 로컬 저장소에 저장합니다.</p>
         </div>
         <span className={apiKeyReady ? "status-pill ready" : "status-pill warning"}>
           {apiKeyReady ? "Ready" : "API Key 필요"}
@@ -606,6 +611,34 @@ function ApiKeyPanel({
           onChange={(event) => onUpdate({ geminiApiKey: event.target.value })}
         />
       </Label>
+
+      <Label className="field-stack">
+        Gemini 이미지 모델
+        <Select
+          value={settings.geminiModel}
+          onValueChange={(value) => onUpdate({ geminiModel: normalizeGeminiImageModel(value) })}
+        >
+          <SelectTrigger>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {geminiImageModels.map((model) => (
+              <SelectItem key={model.id} value={model.id}>
+                {model.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </Label>
+
+      <div className="model-option-list" aria-label="Gemini 이미지 모델 설명">
+        {geminiImageModels.map((model) => (
+          <p data-active={settings.geminiModel === model.id} key={model.id}>
+            <strong>{model.label}</strong>
+            <span>{model.description}</span>
+          </p>
+        ))}
+      </div>
 
       <div className="notice-panel">
         Provider 선택은 제거되었고 Gemini API Key 등록을 기본 설정으로 사용합니다. Google 로그인만으로
@@ -634,7 +667,6 @@ function ExportPanel({
     <>
       <div className="panel-heading">
         <div>
-          <p className="eyebrow">Export</p>
           <h2>내보내기 옵션</h2>
           <p>PNG/ZIP 다운로드와 provider payload preview 옵션을 저장합니다.</p>
         </div>
@@ -709,6 +741,7 @@ function buildPreview(assets: StudioAssets, settings: StudioSettings) {
   return JSON.stringify(
     {
       provider: "gemini",
+      model: settings.geminiModel,
       apiKeyRegistered: settings.geminiApiKey.trim().length > 0,
       promptParts: [
         "cut.imagePrompt",
@@ -843,6 +876,7 @@ function migrateSettings(value: unknown): StudioSettings {
   return {
     provider: "gemini",
     geminiApiKey: getString(value.geminiApiKey, ""),
+    geminiModel: normalizeGeminiImageModel(value.geminiModel),
     exportScale: value.exportScale === "2160" ? "2160" : "1080",
     saveOriginalHtml: typeof value.saveOriginalHtml === "boolean" ? value.saveOriginalHtml : true,
   };
@@ -884,6 +918,7 @@ function createDefaultSettings(): StudioSettings {
   return {
     provider: "gemini",
     geminiApiKey: "",
+    geminiModel: defaultGeminiImageModel,
     exportScale: "1080",
     saveOriginalHtml: true,
   };

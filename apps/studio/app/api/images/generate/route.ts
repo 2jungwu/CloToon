@@ -9,9 +9,14 @@ import {
 } from "@/lib/cuts/image-data-url";
 import {
   buildImageGenerationPrompt,
-  GEMINI_IMAGE_MODEL,
   getSelectedCharacter,
 } from "@/lib/image-generation/prompt-builder";
+import {
+  defaultGeminiImageModel,
+  geminiImageModelIds,
+  type GeminiImageModel,
+  supportsGeminiImageSize,
+} from "@/lib/image-generation/models";
 
 export const runtime = "nodejs";
 export const maxDuration = 120;
@@ -61,6 +66,7 @@ const requestSchema = z.object({
       color: z.string().max(40),
     }),
   }),
+  model: z.enum(geminiImageModelIds).optional().default(defaultGeminiImageModel),
 });
 
 type GeminiPart =
@@ -123,7 +129,7 @@ export async function POST(request: Request) {
     );
   }
 
-  const { apiKey, assets, cut, project } = result.data;
+  const { apiKey, assets, cut, model, project } = result.data;
   const prompt = buildImageGenerationPrompt({ assets, cut, project });
   const selectedCharacter = getSelectedCharacter(assets);
   const parts: GeminiPart[] = [
@@ -138,7 +144,7 @@ export async function POST(request: Request) {
 
   try {
     geminiResponse = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_IMAGE_MODEL}:generateContent`,
+      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
       {
         method: "POST",
         headers: {
@@ -151,13 +157,7 @@ export async function POST(request: Request) {
               parts,
             },
           ],
-          generationConfig: {
-            responseModalities: ["Image"],
-            imageConfig: {
-              aspectRatio: project.canvasPreset,
-              imageSize: "1K",
-            },
-          },
+          generationConfig: buildGeminiGenerationConfig(model, project.canvasPreset),
         }),
         cache: "no-store",
         signal: AbortSignal.timeout(geminiRequestTimeoutMs),
@@ -230,8 +230,18 @@ export async function POST(request: Request) {
   return NextResponse.json({
     imageDataUrl,
     mimeType,
-    model: GEMINI_IMAGE_MODEL,
+    model,
   });
+}
+
+function buildGeminiGenerationConfig(model: GeminiImageModel, aspectRatio: string) {
+  return {
+    responseModalities: ["Image"],
+    imageConfig: {
+      aspectRatio,
+      ...(supportsGeminiImageSize(model) ? { imageSize: "1K" } : {}),
+    },
+  };
 }
 
 function dataUrlToInlinePart(dataUrl: string): GeminiPart | null {

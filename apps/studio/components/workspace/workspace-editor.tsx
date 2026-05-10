@@ -16,6 +16,7 @@ import { toCssImageUrl } from "@/lib/cuts/image-data-url";
 import type { Cut, CutImageStatus } from "@/lib/cuts/types";
 import {
   loadGeminiApiKeyFromStorage,
+  loadGeminiImageModelFromStorage,
   loadImageGenerationAssetsFromStorage,
 } from "@/lib/image-generation/storage";
 import type { ImageGenerationAssets } from "@/lib/image-generation/types";
@@ -227,6 +228,7 @@ export function WorkspaceEditor({ project, initialCuts }: WorkspaceEditorProps) 
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           apiKey,
+          model: loadGeminiImageModelFromStorage(window.localStorage),
           project: {
             id: project.id,
             name: project.name,
