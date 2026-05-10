@@ -71,7 +71,8 @@ const labels = {
   workbench: "\uc6cc\ud06c\ubca4\uce58",
   workbenchAria: "\uc2a4\ud29c\ub514\uc624 \uc6cc\ud06c\ubca4\uce58",
   projectsTitle: "\ud504\ub85c\uc81d\ud2b8",
-  newProject: "+ New",
+  projectListTitle: "\ud504\ub85c\uc81d\ud2b8 \ubaa9\ub85d",
+  newProject: "새로 만들기",
   cancel: "\ucde8\uc18c",
   create: "\uc0dd\uc131",
   creating: "\uc0dd\uc131 \uc911...",
@@ -1185,7 +1186,7 @@ export function StudioWorkbench({ initialProjectId }: StudioWorkbenchProps) {
                 onClick={() => deleteProject(selectedProject)}
                 type="button"
               >
-                {labels.deleteProject}
+                <TrashIcon />
               </button>
             ) : null}
           </header>
@@ -1280,6 +1281,14 @@ function StudioChip({ children }: StudioChipProps) {
   return <span className="ui-chip">{children}</span>;
 }
 
+function TrashIcon() {
+  return (
+    <svg aria-hidden="true" focusable="false" viewBox="0 0 24 24">
+      <path d="M10 11v6m4-6v6m5-11v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+    </svg>
+  );
+}
+
 type ProjectDrawerProps = {
   deletingProjectId: string;
   error: string | null;
@@ -1310,13 +1319,13 @@ function ProjectDrawer({
   return (
     <aside
       className="split-menu workspace-menu project-drawer"
-      aria-label={labels.projectsTitle}
+      aria-label={labels.projectListTitle}
       data-open={open}
       onFocus={onKeepOpen}
       onPointerEnter={onKeepOpen}
     >
       <div className="project-drawer-head">
-        <h1>{labels.projectsTitle}</h1>
+        <p className="eyebrow">{labels.projectListTitle}</p>
         <button
           className="project-create-button"
           onClick={onNewProject}
@@ -1360,7 +1369,7 @@ function ProjectDrawer({
                 onClick={() => onDeleteProject(project)}
                 type="button"
               >
-                {labels.deleteProject}
+                <TrashIcon />
               </button>
             </div>
           );
