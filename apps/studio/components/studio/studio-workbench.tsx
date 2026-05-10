@@ -74,6 +74,15 @@ const labels = {
   projectsTitle: "\ud504\ub85c\uc81d\ud2b8",
   projectListTitle: "\ud504\ub85c\uc81d\ud2b8 \ubaa9\ub85d",
   newProject: "새로 만들기",
+  emptyHeroCardNews: "카드뉴스",
+  emptyHeroComic: "인스타툰",
+  emptyHeroTitlePrefix: "아이디어를",
+  emptyHeroTitleAccent: "장면",
+  emptyHeroTitleSuffix: "으로 바꾸세요.",
+  emptyHeroCopy: "상상하던 장면을 더 빠르고 쉽게.",
+  emptyBuilderTitle: "새 프로젝트를 먼저 만드세요",
+  emptyBuilderCopy: "먼저 제작 형식을 정하세요. 나머지는 워크벤치에서 이어집니다.",
+  emptyCreateProject: "프로젝트 생성",
   cancel: "\ucde8\uc18c",
   create: "\uc0dd\uc131",
   creating: "\uc0dd\uc131 \uc911...",
@@ -169,6 +178,16 @@ const canvasPresetLabels: Record<CanvasPreset, string> = {
   "9:16": "9:16",
 };
 
+const defaultProjectNameByContentType: Record<ContentType, string> = {
+  comic: "새 인스타툰 프로젝트",
+  "card-news": "새 카드뉴스 프로젝트",
+};
+
+const defaultCanvasPresetByContentType: Record<ContentType, CanvasPreset> = {
+  comic: "1:1",
+  "card-news": "4:5",
+};
+
 const emptyImageGenerationAssets: ImageGenerationAssets = {
   selectedCharacterId: "",
   characters: [],
@@ -192,9 +211,9 @@ export function StudioWorkbench({ initialProjectId }: StudioWorkbenchProps) {
   const [projectName, setProjectName] = useState("");
   const [contentType, setContentType] = useState<ContentType>("comic");
   const [canvasPreset, setCanvasPreset] = useState<CanvasPreset>("1:1");
-  const [newProjectName, setNewProjectName] = useState("");
-  const [newContentType, setNewContentType] = useState<ContentType>("comic");
-  const [newCanvasPreset, setNewCanvasPreset] = useState<CanvasPreset>("1:1");
+  const [newProjectName, setNewProjectName] = useState(defaultProjectNameByContentType["card-news"]);
+  const [newContentType, setNewContentType] = useState<ContentType>("card-news");
+  const [newCanvasPreset, setNewCanvasPreset] = useState<CanvasPreset>("4:5");
   const [projectCreateModalOpen, setProjectCreateModalOpen] = useState(false);
   const [projectActionError, setProjectActionError] = useState<string | null>(null);
   const [creatingProject, setCreatingProject] = useState(false);
@@ -646,6 +665,21 @@ export function StudioWorkbench({ initialProjectId }: StudioWorkbenchProps) {
     window.requestAnimationFrame(() => newProjectButtonRef.current?.focus());
   }
 
+  function handleNewContentTypeChange(nextContentType: ContentType) {
+    const previousDefaultName = defaultProjectNameByContentType[newContentType];
+    const previousDefaultCanvas = defaultCanvasPresetByContentType[newContentType];
+
+    setNewContentType(nextContentType);
+
+    if (newProjectName.trim().length === 0 || newProjectName === previousDefaultName) {
+      setNewProjectName(defaultProjectNameByContentType[nextContentType]);
+    }
+
+    if (newCanvasPreset === previousDefaultCanvas) {
+      setNewCanvasPreset(defaultCanvasPresetByContentType[nextContentType]);
+    }
+  }
+
   async function createProject(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
@@ -685,10 +719,12 @@ export function StudioWorkbench({ initialProjectId }: StudioWorkbenchProps) {
         projectsRef.current = nextProjects;
         return nextProjects;
       });
-      setNewProjectName("");
+      setNewProjectName(defaultProjectNameByContentType[newContentType]);
       setProjectLoadState("ready");
       selectProject(createdProject);
-      closeProjectCreateModal();
+      if (projectCreateModalOpen) {
+        closeProjectCreateModal();
+      }
     } catch {
       setProjectActionError(labels.createProjectError);
     } finally {
@@ -1148,9 +1184,14 @@ export function StudioWorkbench({ initialProjectId }: StudioWorkbenchProps) {
     }
   }
 
+  const showEmptyProjectLanding = projectLoadState === "ready" && projects.length === 0;
+
   return (
     <>
-      <section className="studio-workbench-shell" aria-label={labels.workbenchAria}>
+      <section
+        className={showEmptyProjectLanding ? "studio-workbench-shell empty-project-shell" : "studio-workbench-shell"}
+        aria-label={labels.workbenchAria}
+      >
         <ProjectDrawer
           deletingProjectId={deletingProjectId}
           error={projectActionError}
@@ -1165,77 +1206,93 @@ export function StudioWorkbench({ initialProjectId }: StudioWorkbenchProps) {
           selectedProjectId={selectedProjectId}
         />
 
-        <div className="studio-workbench-main">
-          <header className="studio-workbench-head">
-            <div>
-              <p className="eyebrow">{labels.workbench}</p>
-              <h2>{projectName || labels.selectProject}</h2>
-              {selectedProject ? (
-                <span className="project-context-chips">
-                  <StudioChip>{contentTypeLabels[contentType]}</StudioChip>
-                  <StudioChip>{canvasPresetLabels[canvasPreset]}</StudioChip>
-                  <StudioChip>{getSaveLabel(saveState)}</StudioChip>
-                </span>
-              ) : (
-                <p>{labels.selectProjectHelp}</p>
-              )}
-            </div>
-            {selectedProject ? (
-              <button
-                aria-label={`${selectedProject.name} ${labels.deleteProject}`}
-                className="studio-workbench-delete"
-                disabled={deletingProjectId === selectedProject.id}
-                onClick={() => deleteProject(selectedProject)}
-                type="button"
-              >
-                <TrashIcon />
-              </button>
-            ) : null}
-          </header>
-
-          <div className="studio-workbench-grid">
-            <CutList
-              cutLoadState={cutLoadState}
-              cuts={cuts}
-              canIncreaseCutCount={Boolean(selectedProject) && cutLoadState !== "loading"}
-              onDecreaseCutCount={decreaseCutCount}
-              onIncreaseCutCount={increaseCutCount}
-              onSelectCut={selectCut}
-              selectedCutId={selectedCut?.id ?? ""}
+        <div className={showEmptyProjectLanding ? "studio-workbench-main empty-project-main" : "studio-workbench-main"}>
+          {showEmptyProjectLanding ? (
+            <EmptyProjectLanding
+              canvasPreset={newCanvasPreset}
+              contentType={newContentType}
+              creatingProject={creatingProject}
+              error={projectActionError}
+              name={newProjectName}
+              onCanvasPresetChange={setNewCanvasPreset}
+              onContentTypeChange={handleNewContentTypeChange}
+              onCreateProject={createProject}
+              onNameChange={setNewProjectName}
             />
+          ) : (
+            <>
+              <header className="studio-workbench-head">
+                <div>
+                  <p className="eyebrow">{labels.workbench}</p>
+                  <h2>{projectName || labels.selectProject}</h2>
+                  {selectedProject ? (
+                    <span className="project-context-chips">
+                      <StudioChip>{contentTypeLabels[contentType]}</StudioChip>
+                      <StudioChip>{canvasPresetLabels[canvasPreset]}</StudioChip>
+                      <StudioChip>{getSaveLabel(saveState)}</StudioChip>
+                    </span>
+                  ) : (
+                    <p>{labels.selectProjectHelp}</p>
+                  )}
+                </div>
+                {selectedProject ? (
+                  <button
+                    aria-label={`${selectedProject.name} ${labels.deleteProject}`}
+                    className="studio-workbench-delete"
+                    disabled={deletingProjectId === selectedProject.id}
+                    onClick={() => deleteProject(selectedProject)}
+                    type="button"
+                  >
+                    <TrashIcon />
+                  </button>
+                ) : null}
+              </header>
 
-            <ProductionPanel
-              cutLoadState={cutLoadState}
-              exportSettings={studioPreferences.export}
-              exportState={exportState}
-              fullScenario={fullScenario}
-              generationState={generationState}
-              generationMessage={generationMessage}
-              imageGenerationAssets={imageGenerationAssets}
-              onBuildCardNewsInOnePass={buildCardNewsInOnePass}
-              onFlushSelectedCut={() => {
-                if (selectedCut) {
-                  flushPendingCutPatch(selectedCut.id);
-                }
-              }}
-              onGenerateSelectedCutImage={generateSelectedCutImage}
-              onFullScenarioChange={setFullScenario}
-              onUpdateSelectedCut={updateSelectedCut}
-              saveState={saveState}
-              selectedCut={selectedCut}
-              selectedProject={selectedProject}
-            />
+              <div className="studio-workbench-grid">
+                <CutList
+                  cutLoadState={cutLoadState}
+                  cuts={cuts}
+                  canIncreaseCutCount={Boolean(selectedProject) && cutLoadState !== "loading"}
+                  onDecreaseCutCount={decreaseCutCount}
+                  onIncreaseCutCount={increaseCutCount}
+                  onSelectCut={selectCut}
+                  selectedCutId={selectedCut?.id ?? ""}
+                />
 
-            <ImagePreviewPanel
-              canvasPreset={canvasPreset}
-              cut={selectedCut}
-              exportState={exportState}
-              canDownloadAllCutsZip={sortedCuts.length > 0}
-              onDownloadAllCutsZip={downloadAllCutsZip}
-              onDownloadCurrentCut={downloadCurrentCut}
-              project={selectedProject}
-            />
-          </div>
+                <ProductionPanel
+                  cutLoadState={cutLoadState}
+                  exportSettings={studioPreferences.export}
+                  exportState={exportState}
+                  fullScenario={fullScenario}
+                  generationState={generationState}
+                  generationMessage={generationMessage}
+                  imageGenerationAssets={imageGenerationAssets}
+                  onBuildCardNewsInOnePass={buildCardNewsInOnePass}
+                  onFlushSelectedCut={() => {
+                    if (selectedCut) {
+                      flushPendingCutPatch(selectedCut.id);
+                    }
+                  }}
+                  onGenerateSelectedCutImage={generateSelectedCutImage}
+                  onFullScenarioChange={setFullScenario}
+                  onUpdateSelectedCut={updateSelectedCut}
+                  saveState={saveState}
+                  selectedCut={selectedCut}
+                  selectedProject={selectedProject}
+                />
+
+                <ImagePreviewPanel
+                  canvasPreset={canvasPreset}
+                  cut={selectedCut}
+                  exportState={exportState}
+                  canDownloadAllCutsZip={sortedCuts.length > 0}
+                  onDownloadAllCutsZip={downloadAllCutsZip}
+                  onDownloadCurrentCut={downloadCurrentCut}
+                  project={selectedProject}
+                />
+              </div>
+            </>
+          )}
         </div>
       </section>
 
@@ -1252,7 +1309,7 @@ export function StudioWorkbench({ initialProjectId }: StudioWorkbenchProps) {
               closeProjectCreateModal();
             }
           }}
-          onContentTypeChange={setNewContentType}
+          onContentTypeChange={handleNewContentTypeChange}
           onCreateProject={createProject}
           onNameChange={setNewProjectName}
         />
@@ -1379,6 +1436,103 @@ function ProjectDrawer({
         })}
       </div>
     </aside>
+  );
+}
+
+type EmptyProjectLandingProps = {
+  canvasPreset: CanvasPreset;
+  contentType: ContentType;
+  creatingProject: boolean;
+  error: string | null;
+  name: string;
+  onCanvasPresetChange: (canvasPreset: CanvasPreset) => void;
+  onContentTypeChange: (contentType: ContentType) => void;
+  onCreateProject: (event: FormEvent<HTMLFormElement>) => void;
+  onNameChange: (name: string) => void;
+};
+
+function EmptyProjectLanding({
+  canvasPreset,
+  contentType,
+  creatingProject,
+  error,
+  name,
+  onCanvasPresetChange,
+  onContentTypeChange,
+  onCreateProject,
+  onNameChange,
+}: EmptyProjectLandingProps) {
+  return (
+    <section className="empty-project-landing" aria-labelledby="empty-project-title">
+      <div className="empty-project-hero">
+        <div className="empty-project-chip-row" aria-label={`${labels.emptyHeroCardNews}, ${labels.emptyHeroComic}`}>
+          <StudioChip>{labels.emptyHeroCardNews}</StudioChip>
+          <StudioChip>{labels.emptyHeroComic}</StudioChip>
+        </div>
+        <h1 className="empty-project-title" id="empty-project-title">
+          <span>{labels.emptyHeroTitlePrefix}</span>
+          <span>
+            <em>{labels.emptyHeroTitleAccent}</em>
+            {labels.emptyHeroTitleSuffix}
+          </span>
+        </h1>
+        <p className="empty-project-copy">{labels.emptyHeroCopy}</p>
+      </div>
+
+      <form className="empty-project-builder" onSubmit={onCreateProject}>
+        <div className="empty-project-builder-head">
+          <h2>{labels.emptyBuilderTitle}</h2>
+          <p>{labels.emptyBuilderCopy}</p>
+        </div>
+
+        <label className="field-stack">
+          {labels.projectName}
+          <Input
+            aria-label={labels.projectName}
+            onChange={(event) => onNameChange(event.target.value)}
+            placeholder={labels.projectNamePlaceholder}
+            value={name}
+          />
+        </label>
+
+        <label className="field-stack">
+          {labels.contentType}
+          <Select value={contentType} onValueChange={(value) => onContentTypeChange(value as ContentType)}>
+            <SelectTrigger aria-label={labels.contentType}>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent className="project-modal-select-content">
+              <SelectItem value="card-news">{labels.cardNews}</SelectItem>
+              <SelectItem value="comic">{labels.comic}</SelectItem>
+            </SelectContent>
+          </Select>
+        </label>
+
+        <label className="field-stack">
+          {labels.canvas}
+          <Select value={canvasPreset} onValueChange={(value) => onCanvasPresetChange(value as CanvasPreset)}>
+            <SelectTrigger aria-label={labels.canvas}>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent className="project-modal-select-content">
+              <SelectItem value="1:1">1:1</SelectItem>
+              <SelectItem value="4:5">4:5</SelectItem>
+              <SelectItem value="9:16">9:16</SelectItem>
+            </SelectContent>
+          </Select>
+        </label>
+
+        {error ? (
+          <p className="form-error" role="alert">
+            {error}
+          </p>
+        ) : null}
+
+        <button className="empty-project-submit" disabled={creatingProject || name.trim().length === 0} type="submit">
+          {creatingProject ? labels.creating : labels.emptyCreateProject}
+        </button>
+      </form>
+    </section>
   );
 }
 
