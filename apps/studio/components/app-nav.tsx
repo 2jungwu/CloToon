@@ -7,11 +7,18 @@ import { usePathname } from "next/navigation";
 const navItems = [
   {
     href: "/projects",
+    key: "projects",
     label: "프로젝트",
     activePrefixes: ["/projects", "/workspace"],
     icon: ProjectIcon,
   },
-  { href: "/assets", label: "에셋", activePrefixes: ["/assets", "/settings"], icon: AssetsIcon },
+  {
+    href: "/assets",
+    key: "assets",
+    label: "에셋",
+    activePrefixes: ["/assets", "/settings"],
+    icon: AssetsIcon,
+  },
 ];
 
 export function AppNav() {
@@ -36,6 +43,7 @@ export function AppNav() {
             aria-current={pathname === item.href ? "page" : undefined}
             className="app-side-link"
             data-active={active}
+            data-nav-key={item.key}
             href={item.href}
             key={item.href}
           >

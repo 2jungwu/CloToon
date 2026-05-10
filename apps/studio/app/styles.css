@@ -1216,6 +1216,7 @@ textarea::placeholder {
 
 body:has(.app-side-link[href="/projects"]:hover) .project-drawer,
 body:has(.app-side-link[href="/projects"]:focus-visible) .project-drawer,
+.project-drawer[data-open="true"],
 .project-drawer:hover,
 .project-drawer:focus-within {
   opacity: 1;

@@ -218,6 +218,28 @@ export function StudioWorkbench({ initialProjectId }: StudioWorkbenchProps) {
   const cutPatchChainsRef = useRef<Record<string, Promise<Cut | null>>>({});
   const generationInFlightRef = useRef(false);
   const newProjectButtonRef = useRef<HTMLButtonElement | null>(null);
+  const projectDrawerCloseTimerRef = useRef<number | null>(null);
+  const [projectDrawerOpen, setProjectDrawerOpen] = useState(false);
+
+  const cancelProjectDrawerClose = useCallback(() => {
+    if (projectDrawerCloseTimerRef.current) {
+      window.clearTimeout(projectDrawerCloseTimerRef.current);
+      projectDrawerCloseTimerRef.current = null;
+    }
+  }, []);
+
+  const openProjectDrawer = useCallback(() => {
+    cancelProjectDrawerClose();
+    setProjectDrawerOpen(true);
+  }, [cancelProjectDrawerClose]);
+
+  const scheduleProjectDrawerClose = useCallback(() => {
+    cancelProjectDrawerClose();
+    projectDrawerCloseTimerRef.current = window.setTimeout(() => {
+      setProjectDrawerOpen(false);
+      projectDrawerCloseTimerRef.current = null;
+    }, 160);
+  }, [cancelProjectDrawerClose]);
 
   const patchCut = useCallback(
     (cutId: string, patch: UpdateCutInput, projectId = selectedProjectIdRef.current) => {
@@ -494,6 +516,70 @@ export function StudioWorkbench({ initialProjectId }: StudioWorkbenchProps) {
       cancelled = true;
     };
   }, []);
+
+  useEffect(() => {
+    const projectNavLink = document.querySelector<HTMLElement>('[data-nav-key="projects"]');
+
+    if (!projectNavLink) {
+      return undefined;
+    }
+
+    projectNavLink.addEventListener("pointerenter", openProjectDrawer);
+    projectNavLink.addEventListener("focusin", openProjectDrawer);
+    projectNavLink.addEventListener("focusout", scheduleProjectDrawerClose);
+
+    return () => {
+      projectNavLink.removeEventListener("pointerenter", openProjectDrawer);
+      projectNavLink.removeEventListener("focusin", openProjectDrawer);
+      projectNavLink.removeEventListener("focusout", scheduleProjectDrawerClose);
+      cancelProjectDrawerClose();
+    };
+  }, [cancelProjectDrawerClose, openProjectDrawer, scheduleProjectDrawerClose]);
+
+  useEffect(() => {
+    if (!projectDrawerOpen) {
+      return undefined;
+    }
+
+    function isInsideRect(x: number, y: number, rect: DOMRect) {
+      return x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom;
+    }
+
+    function handlePointerMove(event: PointerEvent) {
+      const projectNavLink = document.querySelector<HTMLElement>('[data-nav-key="projects"]');
+      const projectDrawer = document.querySelector<HTMLElement>(".project-drawer");
+
+      if (!projectNavLink || !projectDrawer) {
+        setProjectDrawerOpen(false);
+        return;
+      }
+
+      const navRect = projectNavLink.getBoundingClientRect();
+      const drawerRect = projectDrawer.getBoundingClientRect();
+      const bridgeRect = new DOMRect(
+        Math.min(navRect.right, drawerRect.left),
+        drawerRect.top,
+        Math.abs(drawerRect.left - navRect.right),
+        drawerRect.height,
+      );
+      const x = event.clientX;
+      const y = event.clientY;
+      const insideProjectLayer =
+        isInsideRect(x, y, navRect) ||
+        isInsideRect(x, y, drawerRect) ||
+        isInsideRect(x, y, bridgeRect);
+
+      if (!insideProjectLayer) {
+        setProjectDrawerOpen(false);
+      }
+    }
+
+    document.addEventListener("pointermove", handlePointerMove);
+
+    return () => {
+      document.removeEventListener("pointermove", handlePointerMove);
+    };
+  }, [projectDrawerOpen]);
 
   useEffect(() => {
     const patchTimers = patchTimersRef.current;
@@ -1065,7 +1151,9 @@ export function StudioWorkbench({ initialProjectId }: StudioWorkbenchProps) {
         <ProjectDrawer
           deletingProjectId={deletingProjectId}
           error={projectActionError}
+          open={projectDrawerOpen}
           onDeleteProject={deleteProject}
+          onKeepOpen={openProjectDrawer}
           onNewProject={openProjectCreateModal}
           onProjectSelect={handleProjectSelect}
           projectLoadState={projectLoadState}
@@ -1196,7 +1284,9 @@ type ProjectDrawerProps = {
   deletingProjectId: string;
   error: string | null;
   newProjectButtonRef: RefObject<HTMLButtonElement | null>;
+  open: boolean;
   onDeleteProject: (project: Project) => void;
+  onKeepOpen: () => void;
   onNewProject: () => void;
   onProjectSelect: (projectId: string) => void;
   projectLoadState: LoadState;
@@ -1208,7 +1298,9 @@ function ProjectDrawer({
   deletingProjectId,
   error,
   newProjectButtonRef,
+  open,
   onDeleteProject,
+  onKeepOpen,
   onNewProject,
   onProjectSelect,
   projectLoadState,
@@ -1216,7 +1308,13 @@ function ProjectDrawer({
   selectedProjectId,
 }: ProjectDrawerProps) {
   return (
-    <aside className="split-menu workspace-menu project-drawer" aria-label={labels.projectsTitle}>
+    <aside
+      className="split-menu workspace-menu project-drawer"
+      aria-label={labels.projectsTitle}
+      data-open={open}
+      onFocus={onKeepOpen}
+      onPointerEnter={onKeepOpen}
+    >
       <div className="project-drawer-head">
         <h1>{labels.projectsTitle}</h1>
         <button
