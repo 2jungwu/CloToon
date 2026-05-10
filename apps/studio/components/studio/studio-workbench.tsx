@@ -1218,10 +1218,7 @@ function ProjectDrawer({
   return (
     <aside className="split-menu workspace-menu project-drawer" aria-label={labels.projectsTitle}>
       <div className="project-drawer-head">
-        <div>
-          <p className="eyebrow">{labels.studio}</p>
-          <h1>{labels.projectsTitle}</h1>
-        </div>
+        <h1>{labels.projectsTitle}</h1>
         <button
           className="project-create-button"
           onClick={onNewProject}
@@ -1232,9 +1229,7 @@ function ProjectDrawer({
         </button>
       </div>
 
-      <div className="storyboard-info">
-        <p className="save-state">{getProjectLoadMessage(projectLoadState, projects.length)}</p>
-      </div>
+      <p className="sr-only">{getProjectLoadMessage(projectLoadState, projects.length)}</p>
 
       {error ? (
         <p className="form-error" role="alert">
@@ -1540,7 +1535,6 @@ function CutList({
   return (
     <aside className="split-menu workspace-menu production-cut-list" aria-label={labels.cutList}>
       <div className="storyboard-info">
-        <p className="eyebrow">{labels.cutList}</p>
         <div className="cut-count-stepper">
           <span>{labels.cutCount}</span>
           <div>
@@ -1563,7 +1557,7 @@ function CutList({
             </button>
           </div>
         </div>
-        <p className="save-state">{getCutLoadMessage(cutLoadState)}</p>
+        <p className="sr-only">{getCutLoadMessage(cutLoadState)}</p>
       </div>
 
       <div className="split-menu-list cut-list">
@@ -1617,7 +1611,6 @@ function CutEditor({
     <div className="editor-panel production-editor">
       <div className="panel-heading inline-heading">
         <div>
-          <p className="eyebrow">컷 {selectedCut.position}</p>
           <h2>{selectedCut.caption || labels.selectedCut}</h2>
         </div>
       </div>
@@ -1706,7 +1699,6 @@ function ImagePreviewPanel({
     <aside className="image-preview-panel" aria-label={labels.imageOnlyPreview}>
       <div className="preview-toolbar">
         <div>
-          <p className="eyebrow">{labels.imageOnlyPreview}</p>
           <h2>{labels.imageOnlyPreviewTitle}</h2>
         </div>
       </div>
@@ -1727,6 +1719,7 @@ function ImagePreviewPanel({
           disabled={!project || !cut || exportState === "exporting"}
           onClick={onDownloadCurrentCut}
           type="button"
+          variant="secondary"
         >
           {labels.currentCutPng}
         </Button>
