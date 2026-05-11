@@ -1096,7 +1096,7 @@ textarea::placeholder {
   color: var(--app-text-secondary);
   cursor: pointer;
   font-size: 18px;
-  font-weight: 400;
+  font-weight: 500;
   line-height: 1.35;
   padding: 16px;
   text-align: left;
@@ -1271,7 +1271,7 @@ body:has(.app-side-link[href="/projects"]:focus-visible) .project-drawer,
 }
 
 .project-drawer-row[data-active="true"] {
-  background: transparent;
+  background: #ececf1;
   box-shadow: none;
 }
 
@@ -1345,6 +1345,11 @@ body:has(.app-side-link[href="/projects"]:focus-visible) .project-drawer,
 .project-drawer-meta .ui-chip {
   background: #f1f1f4;
   color: var(--app-text-secondary);
+}
+
+.project-drawer-row[data-active="true"] .project-drawer-meta .ui-chip {
+  background: #eaf4ff;
+  color: var(--app-blue);
 }
 
 .project-row-delete {
@@ -2250,21 +2255,36 @@ body:has(.app-side-link[href="/projects"]:focus-visible) .project-drawer,
   gap: 8px;
 }
 
-.model-option-list p {
+.model-option-item {
   align-items: center;
   background: #f5f5f7;
+  border: 0;
   border-radius: 8px;
   color: var(--app-text-secondary);
+  cursor: pointer;
   display: flex;
+  font: inherit;
   gap: 10px;
   justify-content: space-between;
   margin: 0;
   padding: 12px 14px;
+  text-align: left;
+  transition:
+    background-color 160ms ease,
+    color 160ms ease;
+  width: 100%;
 }
 
-.model-option-list p[data-active="true"] {
+.model-option-item:hover,
+.model-option-item:focus-visible,
+.model-option-item[data-active="true"] {
   background: #ececf1;
   color: var(--app-text);
+  outline: 0;
+}
+
+.model-option-item:focus-visible {
+  box-shadow: inset 0 0 0 3px var(--app-focus);
 }
 
 .model-option-list strong {
