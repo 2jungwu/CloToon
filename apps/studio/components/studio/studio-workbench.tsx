@@ -78,7 +78,7 @@ const labels = {
   emptyHeroComic: "인스타툰",
   emptyHeroTitlePrefix: "아이디어를",
   emptyHeroTitleAccent: "장면",
-  emptyHeroTitleSuffix: "으로 바꾸세요.",
+  emptyHeroTitleSuffix: "으로 바꾸세요",
   emptyHeroCopy: "상상하던 장면을 더 빠르고 쉽게.",
   emptyBuilderTitle: "새 프로젝트를 먼저 만드세요",
   emptyBuilderCopy: "먼저 제작 형식을 정하세요. 나머지는 워크벤치에서 이어집니다.",
