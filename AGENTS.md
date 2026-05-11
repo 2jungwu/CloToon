@@ -25,9 +25,10 @@
 - 의존성 설치: `npm install`
 - 개발 서버 실행: `npm run dev`
 - 프로덕션 빌드: `npm run build`
+- 프로덕션 서버 실행: `npm run start`
 - 린트: `npm run lint`
 - 타입 체크: `npm run typecheck`
-- 테스트: 현재 루트 `package.json`에 `test` 스크립트가 없습니다.
+- 테스트: `npm run test`
 - 브라우저/E2E 테스트: 표준 스크립트는 없고, 필요 시 Playwright를 임시 검증에 사용합니다.
 
 ## Directory Map
@@ -44,6 +45,7 @@
 - `apps/studio/lib/projects/`: 프로젝트 타입과 repository 함수
 - `apps/studio/lib/cuts/`: 컷 타입과 repository 함수
 - `apps/studio/lib/image-generation/`: Gemini prompt 조합, localStorage 로드, 이미지 생성 타입
+- `apps/studio/test/`: Node test runner에서 `@/*` 별칭을 해석하는 테스트 보조 로더
 - `docs/`: PRD 생성/검증 보조 문서와 이미지 생성 규칙 문서
 - `data/`: 로컬 런타임 SQLite 데이터. 사용자 데이터로 취급합니다.
 - `artifacts/`: 과거 스크린샷과 다운로드 검증 산출물. 사용자가 요청하지 않으면 커밋하지 않습니다.
@@ -80,6 +82,7 @@
 
 - TypeScript 또는 API 변경 후 `npm run typecheck`를 실행합니다.
 - 컴포넌트, route, 스타일 변경 후 `npm run lint`를 실행합니다.
+- prompt builder 또는 테스트 대상 로직을 바꾸면 `npm run test`를 실행합니다.
 - 완료 또는 배포 가능 상태를 말하기 전 `npm run build`를 실행합니다.
 - 브라우저에 보이는 UI를 바꾸면 `http://127.0.0.1:3000` 또는 사용 중인 로컬 포트에서 해당 route를 확인합니다.
 - 확인 대상 route: `/projects`, `/assets`, `/settings`, 가능한 경우 `/workspace/[projectId]`.
@@ -134,7 +137,7 @@
 
 ## 확인 필요
 
-- 공식 테스트 러너와 `npm test` 스크립트가 없습니다.
-- 저장소 표준 Playwright, unit, integration 테스트 설정이 없습니다.
+- 현재 `npm run test`는 `apps/studio`의 Node test runner 기반 단위 테스트만 실행합니다.
+- 저장소 표준 Playwright/E2E 테스트 설정은 없습니다.
 - Gemini provider 모델명, 할당량, 가격, 인증 방식은 외부 정책에 따라 변동될 수 있습니다.
 - localhost 외 배포 정책은 현재 제품 범위 밖입니다.
