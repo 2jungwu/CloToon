@@ -14,6 +14,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toCssImageUrl } from "@/lib/cuts/image-data-url";
+import { getCutTextOverlay } from "@/lib/cuts/text-overlay";
 import type { Cut, CutTemplate, UpdateCutInput } from "@/lib/cuts/types";
 import {
   loadGeminiApiKeyFromStorage,
@@ -1297,6 +1298,7 @@ export function StudioWorkbench({ initialProjectId }: StudioWorkbenchProps) {
                   canvasPreset={canvasPreset}
                   cut={selectedCut}
                   exportState={exportState}
+                  fonts={studioPreferences.fonts}
                   canDownloadAllCutsZip={sortedCuts.length > 0}
                   onDownloadAllCutsZip={downloadAllCutsZip}
                   onDownloadCurrentCut={downloadCurrentCut}
@@ -1953,6 +1955,7 @@ type ImagePreviewPanelProps = {
   canvasPreset: CanvasPreset;
   cut: Cut | null;
   exportState: ExportState;
+  fonts: StudioFonts;
   onDownloadAllCutsZip: () => void;
   onDownloadCurrentCut: () => void;
   project: Project | null;
@@ -1963,14 +1966,11 @@ function ImagePreviewPanel({
   canvasPreset,
   cut,
   exportState,
+  fonts,
   onDownloadAllCutsZip,
   onDownloadCurrentCut,
   project,
 }: ImagePreviewPanelProps) {
-  const cssImageUrl = toCssImageUrl(cut?.imageDataUrl ?? "");
-  const hasImage =
-    cssImageUrl !== "none" && (cut?.imageStatus === "generated" || cut?.imageStatus === "uploaded");
-
   return (
     <aside className="image-preview-panel" aria-label={labels.imageOnlyPreview}>
       <div className="preview-toolbar">
@@ -1979,16 +1979,17 @@ function ImagePreviewPanel({
         </div>
       </div>
 
-      <div
-        aria-label={hasImage ? labels.imageOnlyPreviewTitle : labels.imagePreviewPlaceholder}
-        className={`image-preview-canvas ${getCanvasRatioClass(canvasPreset)}`}
-        data-has-image={hasImage}
-        role="img"
-        style={{ "--preview-image": cssImageUrl } as CSSProperties}
-      >
-        {hasImage ? <div className="image-preview-art" /> : null}
-        {!hasImage ? <div className="image-preview-placeholder" aria-hidden="true" /> : null}
-      </div>
+      {project && cut ? (
+        <CutExportCanvas cut={cut} exportId={`preview-${cut.id}`} fonts={fonts} project={project} />
+      ) : (
+        <div
+          aria-label={labels.imagePreviewPlaceholder}
+          className={`image-preview-canvas ${getCanvasRatioClass(canvasPreset)}`}
+          role="img"
+        >
+          <div className="image-preview-placeholder" aria-hidden="true" />
+        </div>
+      )}
 
       <div className="toolbar-row export-actions">
         <Button
@@ -2032,6 +2033,7 @@ function CutExportCanvas({
   const templateClass = cut.template === "card-news" ? "card-news" : "comic";
   const cssImageUrl = toCssImageUrl(cut.imageDataUrl);
   const hasImage = cssImageUrl !== "none";
+  const overlay = getCutTextOverlay(cut);
 
   return (
     <article
@@ -2048,21 +2050,14 @@ function CutExportCanvas({
       <div className={hasImage ? "cut-art-layer has-image" : "cut-art-layer"}>
         {!hasImage ? (
           <div className="art-placeholder">
-            <span>{cut.imagePrompt || labels.imagePreviewPlaceholder}</span>
+            <span>{labels.imagePreviewPlaceholder}</span>
           </div>
         ) : null}
       </div>
-      {cut.template === "card-news" ? (
-        <div className="card-copy">
-          {cut.caption ? <strong>{cut.caption}</strong> : null}
-          {cut.dialogue ? <p>{cut.dialogue}</p> : null}
-        </div>
-      ) : (
-        <>
-          {cut.dialogue ? <p className="speech-bubble">{cut.dialogue}</p> : null}
-          {cut.caption ? <p className="comic-caption">{cut.caption}</p> : null}
-        </>
-      )}
+      <div className="cut-overlay-layer" aria-hidden={!overlay.hasCaption && !overlay.hasDialogue}>
+        {overlay.hasDialogue ? <p className="speech-bubble">{overlay.dialogue}</p> : null}
+        {overlay.hasCaption ? <p className="comic-caption">{overlay.caption}</p> : null}
+      </div>
     </article>
   );
 }

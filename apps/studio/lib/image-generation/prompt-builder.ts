@@ -50,7 +50,9 @@ export function buildImageGenerationPrompt({ assets, cut, project }: BuildImageP
     "- Use the background prompt as the default environment unless the cut prompt clearly overrides it.",
     "- Use caption and dialogue only to understand emotion, action, and layout needs.",
     "- Leave comfortable empty areas for later caption/dialogue HTML/CSS overlays.",
-    "- Do not draw speech bubbles, title cards, subtitles, labels, signs, watermarks, logos, or UI.",
+    "- The app will add the black frame, dialogue bubble, and bottom caption box.",
+    "- Do not draw comic frames, panel borders, color gradient bars, speech bubbles, caption boxes, or text containers.",
+    "- Do not draw title cards, subtitles, labels, signs, watermarks, logos, or UI.",
   ].join("\n");
 }
 

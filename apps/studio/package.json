@@ -8,7 +8,7 @@
     "build": "next build",
     "start": "next start --hostname 127.0.0.1 --port 3000",
     "lint": "eslint .",
-    "test": "node --test --experimental-transform-types --loader ./test/tsconfig-paths-loader.mjs lib/image-generation/prompt-builder.test.ts",
+    "test": "node --test --experimental-transform-types --loader ./test/tsconfig-paths-loader.mjs lib/image-generation/prompt-builder.test.ts lib/cuts/text-overlay.test.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

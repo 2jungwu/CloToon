@@ -68,6 +68,13 @@ test("buildImageGenerationPrompt keeps reference image data URLs out of the prom
   assert.doesNotMatch(prompt, /AAAA/);
 });
 
+test("buildImageGenerationPrompt reserves frames, speech bubbles, and caption boxes for the app overlay", () => {
+  const prompt = buildImageGenerationPrompt({ assets, cut, project });
+
+  assert.match(prompt, /Do not draw comic frames, panel borders, color gradient bars, speech bubbles, caption boxes, or text containers/i);
+  assert.match(prompt, /The app will add the black frame, dialogue bubble, and bottom caption box/i);
+});
+
 test("buildImageGenerationPrompt documents empty cut fields with safe fallback text", () => {
   const prompt = buildImageGenerationPrompt({
     assets,
