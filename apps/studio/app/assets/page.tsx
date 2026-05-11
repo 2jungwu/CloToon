@@ -108,6 +108,7 @@ function AssetsClient({
   const [assets, setAssets] = useState(initialAssets);
   const [settings, setSettings] = useState(initialSettings);
   const [activeSection, setActiveSection] = useState<AssetSection>(initialSection);
+  const [expandedCharacterId, setExpandedCharacterId] = useState(initialAssets.selectedCharacterId);
   const [saveState, setSaveState] = useState<"idle" | "assets" | "settings">("idle");
 
   const selectedCharacter = useMemo(
@@ -145,6 +146,7 @@ function AssetsClient({
   function addCharacter() {
     const nextNumber = assets.characters.length + 1;
     const character = createCharacter(`새 캐릭터 ${nextNumber}`);
+    setExpandedCharacterId(character.id);
     updateAssets((current) => ({
       ...current,
       characters: [...current.characters, character],
@@ -163,6 +165,11 @@ function AssetsClient({
       return;
     }
 
+    const nextCharacterId =
+      assets.characters.find((character) => character.id !== selectedCharacter.id)?.id ??
+      selectedCharacter.id;
+    setExpandedCharacterId(nextCharacterId);
+
     updateAssets((current) => {
       const characters = current.characters.filter((character) => character.id !== selectedCharacter.id);
       return {
@@ -177,24 +184,29 @@ function AssetsClient({
     updateAssets((current) => ({ ...current, selectedCharacterId: characterId }));
   }
 
-  function updateSelectedCharacter(patch: Partial<CharacterAsset>) {
+  function toggleCharacter(characterId: string) {
+    setExpandedCharacterId((current) => (current === characterId ? "" : characterId));
+    selectCharacter(characterId);
+  }
+
+  function updateCharacter(characterId: string, patch: Partial<CharacterAsset>) {
     updateAssets((current) => ({
       ...current,
       characters: current.characters.map((character) =>
-        character.id === selectedCharacter.id ? { ...character, ...patch } : character,
+        character.id === characterId ? { ...character, ...patch } : character,
       ),
     }));
   }
 
-  async function importMarkdown(file: File | null) {
+  async function importMarkdown(characterId: string, file: File | null) {
     if (!file) {
       return;
     }
 
-    updateSelectedCharacter({ markdown: await file.text() });
+    updateCharacter(characterId, { markdown: await file.text() });
   }
 
-  async function importExpressions(files: FileList | null) {
+  async function importExpressions(characterId: string, files: FileList | null) {
     if (!files?.length) {
       return;
     }
@@ -213,18 +225,34 @@ function AssetsClient({
       }),
     );
 
-    updateSelectedCharacter({
-      expressions: [
-        ...selectedCharacter.expressions,
-        ...images.filter((image): image is ExpressionImage => image !== null),
-      ],
-    });
+    updateAssets((current) => ({
+      ...current,
+      characters: current.characters.map((character) =>
+        character.id === characterId
+          ? {
+              ...character,
+              expressions: [
+                ...character.expressions,
+                ...images.filter((image): image is ExpressionImage => image !== null),
+              ],
+            }
+          : character,
+      ),
+    }));
   }
 
-  function deleteExpression(expressionId: string) {
-    updateSelectedCharacter({
-      expressions: selectedCharacter.expressions.filter((image) => image.id !== expressionId),
-    });
+  function deleteExpression(characterId: string, expressionId: string) {
+    updateAssets((current) => ({
+      ...current,
+      characters: current.characters.map((character) =>
+        character.id === characterId
+          ? {
+              ...character,
+              expressions: character.expressions.filter((image) => image.id !== expressionId),
+            }
+          : character,
+      ),
+    }));
   }
 
   return (
@@ -264,10 +292,10 @@ function AssetsClient({
               onImportExpressions={importExpressions}
               onImportMarkdown={importMarkdown}
               onSave={saveAssets}
-              onSelectCharacter={selectCharacter}
-              onUpdateCharacter={updateSelectedCharacter}
+              onToggleCharacter={toggleCharacter}
+              onUpdateCharacter={updateCharacter}
+              expandedCharacterId={expandedCharacterId}
               saveState={saveState}
-              selectedCharacter={selectedCharacter}
             />
           ) : null}
 
@@ -342,23 +370,23 @@ function CharacterPanel({
   onImportExpressions,
   onImportMarkdown,
   onSave,
-  onSelectCharacter,
+  onToggleCharacter,
   onUpdateCharacter,
+  expandedCharacterId,
   saveState,
-  selectedCharacter,
 }: {
   characterCount: number;
   characters: CharacterAsset[];
   onAddCharacter: () => void;
   onDeleteCharacter: () => void;
-  onDeleteExpression: (expressionId: string) => void;
-  onImportExpressions: (files: FileList | null) => void;
-  onImportMarkdown: (file: File | null) => void;
+  onDeleteExpression: (characterId: string, expressionId: string) => void;
+  onImportExpressions: (characterId: string, files: FileList | null) => void;
+  onImportMarkdown: (characterId: string, file: File | null) => void;
   onSave: () => void;
-  onSelectCharacter: (characterId: string) => void;
-  onUpdateCharacter: (patch: Partial<CharacterAsset>) => void;
+  onToggleCharacter: (characterId: string) => void;
+  onUpdateCharacter: (characterId: string, patch: Partial<CharacterAsset>) => void;
+  expandedCharacterId: string;
   saveState: "idle" | "assets" | "settings";
-  selectedCharacter: CharacterAsset;
 }) {
   return (
     <>
@@ -374,14 +402,16 @@ function CharacterPanel({
 
       <div className="character-disclosure-list">
         {characters.map((character) => {
-          const expanded = character.id === selectedCharacter.id;
+          const expanded = character.id === expandedCharacterId;
+          const bodyId = `character-${character.id}-body`;
 
           return (
             <section className="character-disclosure" data-open={expanded} key={character.id}>
               <button
+                aria-controls={bodyId}
                 aria-expanded={expanded}
                 className="character-disclosure-trigger"
-                onClick={() => onSelectCharacter(character.id)}
+                onClick={() => onToggleCharacter(character.id)}
                 type="button"
               >
                 <span className="character-disclosure-title">{character.name}</span>
@@ -392,12 +422,12 @@ function CharacterPanel({
               </button>
 
               {expanded ? (
-                <div className="character-disclosure-body">
+                <div className="character-disclosure-body" id={bodyId}>
                   <Label className="field-stack">
                     캐릭터 이름
                     <Input
                       value={character.name}
-                      onChange={(event) => onUpdateCharacter({ name: event.target.value })}
+                      onChange={(event) => onUpdateCharacter(character.id, { name: event.target.value })}
                     />
                   </Label>
 
@@ -406,7 +436,7 @@ function CharacterPanel({
                     <Textarea
                       value={character.markdown}
                       rows={10}
-                      onChange={(event) => onUpdateCharacter({ markdown: event.target.value })}
+                      onChange={(event) => onUpdateCharacter(character.id, { markdown: event.target.value })}
                     />
                   </Label>
 
@@ -416,7 +446,9 @@ function CharacterPanel({
                       <input
                         type="file"
                         accept=".md,text/markdown,text/plain"
-                        onChange={(event) => onImportMarkdown(event.target.files?.[0] ?? null)}
+                        onChange={(event) =>
+                          onImportMarkdown(character.id, event.target.files?.[0] ?? null)
+                        }
                       />
                     </Label>
                     <Label className="upload-button">
@@ -425,7 +457,7 @@ function CharacterPanel({
                         type="file"
                         multiple
                         accept="image/png,image/jpeg,image/webp"
-                        onChange={(event) => onImportExpressions(event.target.files)}
+                        onChange={(event) => onImportExpressions(character.id, event.target.files)}
                       />
                     </Label>
                     <Button
@@ -447,7 +479,7 @@ function CharacterPanel({
                           <span>{image.name}</span>
                           <Button
                             aria-label={`${image.name} 캐릭터 표정 삭제`}
-                            onClick={() => onDeleteExpression(image.id)}
+                            onClick={() => onDeleteExpression(character.id, image.id)}
                             size="icon-sm"
                             type="button"
                             variant="ghost"
@@ -612,32 +644,24 @@ function ApiKeyPanel({
         />
       </Label>
 
-      <Label className="field-stack">
-        Gemini 이미지 모델
-        <Select
-          value={settings.geminiModel}
-          onValueChange={(value) => onUpdate({ geminiModel: normalizeGeminiImageModel(value) })}
-        >
-          <SelectTrigger>
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {geminiImageModels.map((model) => (
-              <SelectItem key={model.id} value={model.id}>
-                {model.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </Label>
-
-      <div className="model-option-list" aria-label="Gemini 이미지 모델 설명">
-        {geminiImageModels.map((model) => (
-          <p data-active={settings.geminiModel === model.id} key={model.id}>
-            <strong>{model.label}</strong>
-            <span>{model.description}</span>
-          </p>
-        ))}
+      <div className="field-stack">
+        <span>Gemini 이미지 모델</span>
+        <div className="model-option-list" aria-label="Gemini 이미지 모델" role="radiogroup">
+          {geminiImageModels.map((model) => (
+            <button
+              aria-checked={settings.geminiModel === model.id}
+              className="model-option-item"
+              data-active={settings.geminiModel === model.id}
+              key={model.id}
+              onClick={() => onUpdate({ geminiModel: model.id })}
+              role="radio"
+              type="button"
+            >
+              <strong>{model.label}</strong>
+              <span>{model.description}</span>
+            </button>
+          ))}
+        </div>
       </div>
 
       <div className="notice-panel">
