@@ -3,8 +3,9 @@ import type {
   ImageGenerationAssets,
   ImageGenerationCharacter,
 } from "@/lib/image-generation/types";
+import { defaultGeminiImageModel } from "@/lib/image-generation/models";
 
-export const GEMINI_IMAGE_MODEL = "gemini-3.1-flash-image-preview";
+export const GEMINI_IMAGE_MODEL = defaultGeminiImageModel;
 
 export const GENERATED_IMAGE_TEXT_BAN =
   "No readable text, captions, speech bubbles, Korean lettering, UI text, subtitles, or dialogue inside the generated image.";
