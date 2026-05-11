@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { buildImageGenerationPrompt } from "./prompt-builder.ts";
+import { buildImageGenerationPrompt, GENERATED_IMAGE_TEXT_BAN } from "./prompt-builder.ts";
 import type {
   ImageGenerationAssets,
   ImageGenerationCut,
@@ -42,17 +42,66 @@ const assets: ImageGenerationAssets = {
   },
 };
 
-test("buildImageGenerationPrompt combines assets and cut context while banning rendered text", () => {
+test("buildImageGenerationPrompt creates an art-layer prompt with overlay-only text context", () => {
   const prompt = buildImageGenerationPrompt({ assets, cut, project });
 
+  assert.match(prompt, /generated art layer/);
+  assert.match(prompt, /HTML\/CSS text overlays/);
   assert.match(prompt, /clo/);
   assert.match(prompt, /round silhouette/);
   assert.match(prompt, /sunny studio/);
   assert.match(prompt, /glowing laptop/);
   assert.match(prompt, /soft editorial webtoon composition/);
-  assert.match(prompt, /Unexpected message/);
-  assert.match(prompt, /What is this/);
+  assert.match(prompt, /Caption overlay context only, never draw this text: Unexpected message/);
+  assert.match(prompt, /Dialogue overlay context only, never draw this text: What is this/);
   assert.match(prompt, /1:1 square canvas/);
   assert.match(prompt, /Quality guardrails/);
-  assert.match(prompt, /No readable text, captions, speech bubbles, Korean lettering, UI text, subtitles, or dialogue/);
+  assert.match(prompt, new RegExp(GENERATED_IMAGE_TEXT_BAN));
+  assert.doesNotMatch(prompt, /gemini-/i);
+});
+
+test("buildImageGenerationPrompt keeps reference image data URLs out of the prompt text", () => {
+  const prompt = buildImageGenerationPrompt({ assets, cut, project });
+
+  assert.match(prompt, /Expression reference images provided: smile\.png/);
+  assert.doesNotMatch(prompt, /data:image/i);
+  assert.doesNotMatch(prompt, /AAAA/);
+});
+
+test("buildImageGenerationPrompt documents empty cut fields with safe fallback text", () => {
+  const prompt = buildImageGenerationPrompt({
+    assets,
+    project,
+    cut: {
+      ...cut,
+      scenario: "",
+      caption: "",
+      dialogue: "",
+      imagePrompt: "",
+    },
+  });
+
+  assert.match(prompt, /Scenario: No scenario provided\./);
+  assert.match(prompt, /Caption overlay context only, never draw this text: No caption provided\./);
+  assert.match(prompt, /Dialogue overlay context only, never draw this text: No dialogue provided\./);
+  assert.match(prompt, /Clean editorial webtoon composition, consistent character, no text\./);
+});
+
+test("buildImageGenerationPrompt preserves canvas-specific composition context", () => {
+  assert.match(
+    buildImageGenerationPrompt({
+      assets,
+      cut,
+      project: { ...project, canvasPreset: "4:5" },
+    }),
+    /4:5 vertical feed canvas/,
+  );
+  assert.match(
+    buildImageGenerationPrompt({
+      assets,
+      cut,
+      project: { ...project, canvasPreset: "9:16" },
+    }),
+    /9:16 story\/reels canvas/,
+  );
 });

@@ -16,8 +16,8 @@ import { toCssImageUrl } from "@/lib/cuts/image-data-url";
 import type { Cut, CutImageStatus } from "@/lib/cuts/types";
 import {
   loadGeminiApiKeyFromStorage,
-  loadGeminiImageModelFromStorage,
   loadImageGenerationAssetsFromStorage,
+  loadSelectedGeminiImageModelFromStorage,
 } from "@/lib/image-generation/storage";
 import type { ImageGenerationAssets } from "@/lib/image-generation/types";
 import type { Project } from "@/lib/projects/types";
@@ -212,6 +212,16 @@ export function WorkspaceEditor({ project, initialCuts }: WorkspaceEditorProps) 
       return;
     }
 
+    const model = loadSelectedGeminiImageModelFromStorage(window.localStorage);
+
+    if (!model) {
+      setGenerationState({
+        status: "error",
+        message: "\uc790\uc0b0 > API\uc5d0\uc11c Gemini \uc774\ubbf8\uc9c0 \ubaa8\ub378\uc744 \uba3c\uc800 \uc800\uc7a5\ud574\uc8fc\uc138\uc694.",
+      });
+      return;
+    }
+
     let savedCut: Cut | null = null;
     setGenerationState({ status: "generating", message: "컷 저장 후 이미지 생성 중..." });
 
@@ -228,7 +238,7 @@ export function WorkspaceEditor({ project, initialCuts }: WorkspaceEditorProps) 
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           apiKey,
-          model: loadGeminiImageModelFromStorage(window.localStorage),
+          model,
           project: {
             id: project.id,
             name: project.name,

@@ -12,7 +12,6 @@ import {
   getSelectedCharacter,
 } from "@/lib/image-generation/prompt-builder";
 import {
-  defaultGeminiImageModel,
   geminiImageModelIds,
   type GeminiImageModel,
   supportsGeminiImageSize,
@@ -66,7 +65,7 @@ const requestSchema = z.object({
       color: z.string().max(40),
     }),
   }),
-  model: z.enum(geminiImageModelIds).optional().default(defaultGeminiImageModel),
+  model: z.enum(geminiImageModelIds),
 });
 
 type GeminiPart =
@@ -113,6 +112,17 @@ export async function POST(request: Request) {
         message: body.message,
       },
       { status: body.httpStatus },
+    );
+  }
+
+  if (!hasSupportedGeminiImageModel(body.value)) {
+    return NextResponse.json(
+      {
+        error: "Missing or unsupported Gemini image model",
+        status: "MODEL_REQUIRED",
+        message: "Assets > API에서 사용할 Gemini 이미지 모델을 선택하고 저장해주세요.",
+      },
+      { status: 400 },
     );
   }
 
@@ -358,4 +368,14 @@ function redactApiKey(message: string, apiKey: string) {
 
 function sanitizeProviderMessage(message: string, apiKey: string) {
   return redactApiKey(message, apiKey).slice(0, 2000);
+}
+
+function hasSupportedGeminiImageModel(value: unknown): value is { model: GeminiImageModel } {
+  if (typeof value !== "object" || value === null || !("model" in value)) {
+    return false;
+  }
+
+  return geminiImageModelIds.includes(
+    (value as { model?: unknown }).model as GeminiImageModel,
+  );
 }

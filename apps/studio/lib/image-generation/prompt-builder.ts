@@ -3,9 +3,6 @@ import type {
   ImageGenerationAssets,
   ImageGenerationCharacter,
 } from "@/lib/image-generation/types";
-import { defaultGeminiImageModel } from "@/lib/image-generation/models";
-
-export const GEMINI_IMAGE_MODEL = defaultGeminiImageModel;
 
 export const GENERATED_IMAGE_TEXT_BAN =
   "No readable text, captions, speech bubbles, Korean lettering, UI text, subtitles, or dialogue inside the generated image.";
@@ -16,9 +13,9 @@ export function buildImageGenerationPrompt({ assets, cut, project }: BuildImageP
   const expressionNames = character.expressions.map((expression) => expression.name).filter(Boolean);
 
   return [
-    "Create the image layer for a local Instagram comic/card-news cut.",
+    "Create only the generated art layer for a local Instagram comic/card-news cut.",
     GENERATED_IMAGE_TEXT_BAN,
-    "The final Korean caption and dialogue will be rendered later as HTML/CSS overlays, so the image must remain clean.",
+    "The final cut will be composed later with editable HTML/CSS text overlays, so keep the art layer clean and text-free.",
     "",
     `Project: ${project.name}`,
     `Content type: ${project.contentType}`,
@@ -39,8 +36,8 @@ export function buildImageGenerationPrompt({ assets, cut, project }: BuildImageP
     "",
     "Cut context:",
     `Scenario: ${cut.scenario || "No scenario provided."}`,
-    `Caption context only, do not render as text: ${cut.caption || "No caption provided."}`,
-    `Dialogue context only, do not render as text: ${cut.dialogue || "No dialogue provided."}`,
+    `Caption overlay context only, never draw this text: ${cut.caption || "No caption provided."}`,
+    `Dialogue overlay context only, never draw this text: ${cut.dialogue || "No dialogue provided."}`,
     "",
     "Visual direction:",
     cut.imagePrompt || "Clean editorial webtoon composition, consistent character, no text.",
@@ -51,7 +48,8 @@ export function buildImageGenerationPrompt({ assets, cut, project }: BuildImageP
     "Composition requirements:",
     "- Keep the selected character visually consistent with the markdown and expression references.",
     "- Use the background prompt as the default environment unless the cut prompt clearly overrides it.",
-    "- Leave comfortable empty areas for later caption/dialogue overlays.",
+    "- Use caption and dialogue only to understand emotion, action, and layout needs.",
+    "- Leave comfortable empty areas for later caption/dialogue HTML/CSS overlays.",
     "- Do not draw speech bubbles, title cards, subtitles, labels, signs, watermarks, logos, or UI.",
   ].join("\n");
 }
