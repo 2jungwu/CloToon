@@ -1,299 +1,959 @@
-# Studio Workbench 구현 계획
+# Studio Workbench Implementation Plan
 
-> **에이전트 작업자 필수 지침:** 이 계획을 구현할 때는 `superpowers:subagent-driven-development` 또는 `superpowers:executing-plans`를 사용한다. 단계 추적은 checkbox 문법(`- [ ]`)을 사용한다.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**목표:** `Projects`와 `Workspace`를 하나의 Linear Studio 스타일 Workbench로 통합한다.
+**Goal:** `Projects`와 `Workspace`를 카드형 UI가 아닌 분할형 Studio Workbench로 통합하고, 사이드 레일, 프로젝트 drawer, 생성 modal, 단일 chip 규격을 실제 앱에 적용한다.
 
-**아키텍처:** 새 client component `apps/studio/components/studio/studio-workbench.tsx`를 추가해 프로젝트 선택, 프로젝트 생성/삭제, 컷 목록, 컷별 입력, Gemini 이미지 생성, preview, export orchestration을 담당한다. 기존 DB schema, 기존 프로젝트/컷 API, 기존 Assets localStorage 구조는 유지한다. `/projects`와 `/workspace/[projectId]`는 같은 Workbench를 렌더링하며, `/workspace/[projectId]`는 해당 프로젝트를 선택한 deep link로 동작한다.
+**Architecture:** 기존 `apps/studio/components/studio/studio-workbench.tsx`가 이미 프로젝트/컷/Gemini/export orchestration을 담당하므로 새 화면을 다시 만들지 않고 이 컴포넌트를 최신 스펙에 맞게 재구성한다. 전역 상단 header는 side rail 기반 app navigation으로 바꾸고, 프로젝트 목록은 Workbench 내부 drawer로 분리하며, 프로젝트 생성은 inline form이 아니라 modal에서 처리한다.
 
-**기술 스택:** Next.js App Router, React, TypeScript strict mode, 기존 shadcn/Radix UI wrapper, SQLite-backed JSON API, Gemini image route, `html-to-image`, `jszip`, Tailwind CSS v4, `apps/studio/app/styles.css`.
+**Tech Stack:** Next.js App Router, React 19, TypeScript strict mode, Tailwind CSS v4, Radix Select wrapper, shadcn-style Button/Input/Textarea, existing SQLite JSON API, existing Gemini image route, `html-to-image`, `jszip`, `apps/studio/app/styles.css`.
 
 ---
 
-## 현재 상태와 주의사항
+## 현재 상태
 
-- 현재 작업 트리에 이전 UI 수정이 남아 있을 수 있다.
-  - `apps/studio/app/styles.css`
-  - `apps/studio/components/projects/project-list.tsx`
-  - `apps/studio/components/workspace/workspace-editor.tsx`
-- 해당 변경은 되돌리지 않는다.
-- `.superpowers/`와 `output/`은 사용자가 명시하지 않으면 커밋하지 않는다.
-- API key는 계속 브라우저 `localStorage`와 요청 처리 중에만 사용한다.
-- `한 번에 제작`은 사용자가 누를 때만 실행한다.
-- `한 번에 제작`은 Gemini 호출을 병렬로 보내지 않고 순차 처리한다.
-- Genspark식 preview 요소 선택 편집은 v2 범위이며 이번 구현에서 제외한다.
+- 구현 브랜치: `codex/studio-workbench`
+- 최신 설계 스펙: `docs/superpowers/specs/2026-05-09-studio-workbench-design.md`
+- 기존 Workbench 컴포넌트: `apps/studio/components/studio/studio-workbench.tsx`
+- 기존 route 연결:
+  - `apps/studio/app/projects/page.tsx`
+  - `apps/studio/app/workspace/[projectId]/page.tsx`
+- 기존 생성/export 로직은 유지한다.
+- `.superpowers/`와 `output/`은 커밋하지 않는다.
 
-## 변경 파일 구조
-
-생성:
-
-- `apps/studio/components/studio/studio-workbench.tsx`
-  - Workbench 전체 상태와 orchestration 담당
-  - 내부 subcomponent: `ProjectRail`, `StudioChip`, `ProductionPanel`, `CutList`, `CutEditor`, `ImagePreviewPanel`, `CutExportCanvas`
+## 파일 구조
 
 수정:
 
-- `apps/studio/app/projects/page.tsx`
-  - 기존 `ProjectList` 화면 대신 `StudioWorkbench` 렌더링
-- `apps/studio/app/workspace/[projectId]/page.tsx`
-  - 기존 Workspace 상세 UI 대신 `StudioWorkbench initialProjectId={projectId}` 렌더링
+- `apps/studio/app/layout.tsx`
+  - 상단 header 제거
+  - side rail navigation을 전역 navigation으로 렌더링
+  - `main`에 side rail 폭을 고려한 layout class 부여
 - `apps/studio/components/app-nav.tsx`
-  - `/projects` label을 `Studio`로 변경
+  - 상단 pill nav에서 vertical side rail로 전환
+  - 로고 PNG placeholder, 수평 라인, `프로젝트`, `에셋` 메뉴 구현
+- `apps/studio/components/studio/studio-workbench.tsx`
+  - `ProjectRail`을 `ProjectDrawer`로 개편
+  - inline 프로젝트 생성 form 제거
+  - `ProjectCreateModal` 추가
+  - `StudioChip` class를 단일 `.ui-chip`로 전환
+  - Workbench head, 컷 수, 컷 목록, 미리보기 영역 구조 정리
 - `apps/studio/app/styles.css`
-  - Linear Studio workbench layout, chip, hover delete, icon-only stepper, image-only preview, responsive style 추가
+  - app side rail
+  - project drawer
+  - project create modal
+  - split-only Workbench layout
+  - 단일 `.ui-chip`
+  - 1180px 컨테이너
+  - 80px header/main spacing 대체 spacing
+  - responsive rules
 
 유지:
 
-- `apps/studio/components/projects/project-list.tsx`
+- `apps/studio/app/api/**`
+- `apps/studio/lib/projects/**`
+- `apps/studio/lib/cuts/**`
+- `apps/studio/lib/image-generation/**`
 - `apps/studio/components/workspace/workspace-editor.tsx`
-
-위 두 파일은 route 교체 후 바로 삭제하지 않는다. 검증 완료 후 별도 정리 대상으로 둔다.
+- `apps/studio/components/projects/project-list.tsx`
 
 ---
 
-## Task 1: Workbench Shell과 라우팅 연결
+## Task 1: 전역 Header를 Side Rail Navigation으로 전환
 
-**파일:**
+**Files:**
 
-- 생성: `apps/studio/components/studio/studio-workbench.tsx`
-- 수정: `apps/studio/app/projects/page.tsx`
-- 수정: `apps/studio/app/workspace/[projectId]/page.tsx`
-- 수정: `apps/studio/components/app-nav.tsx`
+- Modify: `apps/studio/app/layout.tsx`
+- Modify: `apps/studio/components/app-nav.tsx`
+- Modify: `apps/studio/app/styles.css`
 
-- [ ] `StudioWorkbench` client component skeleton을 만든다.
-- [ ] `Project`, `Cut`, image generation, export에 필요한 기존 타입과 helper를 import한다.
-- [ ] `projects`, `selectedProjectId`, `cuts`, `selectedCutId`, `projectName`, `contentType`, `canvasPreset`, `fullScenario`, loading/save/generation/export state를 둔다.
-- [ ] `/api/projects`로 프로젝트 목록을 불러오는 `loadProjects`를 구현한다.
-- [ ] `/api/projects/[projectId]/cuts`로 컷 목록을 불러오는 `loadCuts`를 구현한다.
-- [ ] `initialProjectId`가 있으면 해당 프로젝트를 우선 선택한다.
-- [ ] `/projects`는 `StudioWorkbench`를 렌더링한다.
-- [ ] `/workspace/[projectId]`는 프로젝트 존재 여부를 확인한 뒤 `StudioWorkbench initialProjectId={projectId}`를 렌더링한다.
-- [ ] `AppNav`의 visible label을 `Projects`에서 `Studio`로 바꾼다.
-- [ ] 검증: `npm run typecheck`
-- [ ] 커밋: `Add studio workbench shell`
+- [ ] **Step 1: `layout.tsx`에서 header wrapper를 제거하고 side rail을 main과 나란히 둔다.**
+
+  적용 형태:
+
+  ```tsx
+  export default function RootLayout({
+    children,
+  }: Readonly<{
+    children: React.ReactNode;
+  }>) {
+    return (
+      <html lang="ko" className="font-sans">
+        <body>
+          <AppNav />
+          <main className="app-main">{children}</main>
+        </body>
+      </html>
+    );
+  }
+  ```
+
+- [ ] **Step 2: `AppNav`를 vertical side rail로 바꾼다.**
+
+  적용 형태:
+
+  ```tsx
+  const navItems = [
+    { href: "/projects", label: "프로젝트", activePrefixes: ["/projects", "/workspace"] },
+    { href: "/assets", label: "에셋", activePrefixes: ["/assets", "/settings"] },
+  ];
+
+  export function AppNav() {
+    const pathname = usePathname();
+
+    return (
+      <nav className="app-side-rail" aria-label="Primary navigation">
+        <div className="app-logo-slot" aria-label="로고 PNG 자리">
+          Logo
+        </div>
+        <div className="app-side-divider" />
+        {navItems.map((item) => {
+          const active = item.activePrefixes.some(
+            (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`),
+          );
+
+          return (
+            <Link
+              aria-current={active ? "page" : undefined}
+              className="app-side-link"
+              data-active={active}
+              href={item.href}
+              key={item.href}
+            >
+              <span className="app-side-icon" aria-hidden="true" />
+              <span>{item.label}</span>
+            </Link>
+          );
+        })}
+      </nav>
+    );
+  }
+  ```
+
+- [ ] **Step 3: side rail CSS를 추가한다.**
+
+  핵심 규격:
+
+  ```css
+  .app-main {
+    min-height: 100vh;
+    padding-left: 72px;
+  }
+
+  .app-side-rail {
+    align-items: center;
+    background: #1f2024;
+    color: #ffffff;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    inset: 0 auto 0 0;
+    padding: 18px 8px;
+    position: fixed;
+    width: 72px;
+    z-index: 40;
+  }
+
+  .app-logo-slot {
+    align-items: center;
+    border: 1px dashed rgba(255, 255, 255, 0.45);
+    color: rgba(255, 255, 255, 0.68);
+    display: flex;
+    font-size: 10px;
+    height: 48px;
+    justify-content: center;
+    line-height: 1.1;
+    text-align: center;
+    width: 48px;
+  }
+
+  .app-side-divider {
+    background: rgba(255, 255, 255, 0.5);
+    height: 1px;
+    margin: 4px 0 8px;
+    width: 40px;
+  }
+  ```
+
+- [ ] **Step 4: 기존 `.app-header`, `.app-header-inner`, `.brand`가 더 이상 렌더링되지 않는지 확인한다.**
+
+  실행:
+
+  ```powershell
+  npm run typecheck
+  ```
+
+  기대 결과: TypeScript error 0.
+
+- [ ] **Step 5: 커밋한다.**
+
+  ```powershell
+  git add apps/studio/app/layout.tsx apps/studio/components/app-nav.tsx apps/studio/app/styles.css
+  git commit -m "Add side rail navigation" -m "Replaces the top header with the Workbench side rail skeleton and keeps Studio/Assets routing intact." -m "Constraint: navigation-only change; no project, cut, provider, or export data changes." -m "Tested: npm run typecheck." -m "Co-authored-by: OmX <omx@oh-my-codex.dev>"
+  ```
 
 수용 기준:
 
-- `/projects`와 `/workspace/[projectId]`가 같은 Workbench shell을 렌더링한다.
-- `/workspace/[projectId]`는 기존처럼 없는 프로젝트에서 `notFound()` 처리한다.
-- 타입 체크가 통과한다.
+- 사이드바에는 로고 자리, 수평 라인 1개, `프로젝트`, `에셋`만 보인다.
+- 로고와 메뉴 사이에만 수평 라인이 있다.
+- `New`는 side rail에 보이지 않는다.
+- `/projects`, `/workspace/[projectId]`, `/assets` navigation이 유지된다.
 
 ---
 
-## Task 2: 왼쪽 Projects Rail 구현
+## Task 2: 프로젝트 목록을 Drawer로 분리하고 생성 Modal 추가
 
-**파일:**
+**Files:**
 
-- 수정: `apps/studio/components/studio/studio-workbench.tsx`
-- 수정: `apps/studio/app/styles.css`
+- Modify: `apps/studio/components/studio/studio-workbench.tsx`
+- Modify: `apps/studio/app/styles.css`
 
-- [ ] `createProject` handler를 구현한다.
-  - POST `/api/projects`
-  - body: `{ name, contentType, canvasPreset }`
-  - 성공 시 목록 앞에 추가하고 새 프로젝트를 선택한다.
-- [ ] `deleteProject` handler를 구현한다.
-  - 삭제 전 `window.confirm`
-  - DELETE `/api/projects/[projectId]`
-  - 성공 시 목록에서 제거하고 다음 프로젝트를 선택한다.
-- [ ] `StudioChip` component를 추가한다.
-- [ ] `ProjectRail` component를 추가한다.
-- [ ] 프로젝트 검색 UI는 만들지 않는다.
-- [ ] 새 프로젝트 폼은 프로젝트 이름, 콘텐츠 유형 dropdown, 캔버스 dropdown, `프로젝트 추가` 버튼으로 구성한다.
-- [ ] 프로젝트 행에는 chip을 사용한다.
-  - 콘텐츠 유형
-  - 캔버스
-  - 필요 시 컷 수
-- [ ] 프로젝트 삭제 버튼은 hover/focus에서 노출한다.
-- [ ] primary 색상은 블루 계열로 유지한다.
-- [ ] styles.css에 rail, chip, hover delete, form style을 추가한다.
-- [ ] 검증: `npm run typecheck`, `npm run lint`
-- [ ] 커밋: `Build studio project rail`
+- [ ] **Step 1: Workbench state에 modal과 drawer 상태를 추가한다.**
+
+  `StudioWorkbench` 내부 state 근처에 추가:
+
+  ```tsx
+  const [projectDrawerOpen, setProjectDrawerOpen] = useState(true);
+  const [projectCreateModalOpen, setProjectCreateModalOpen] = useState(false);
+  ```
+
+- [ ] **Step 2: `createProject` 완료 후 modal을 닫는다.**
+
+  생성 성공 흐름에서 `selectProject(createdProject);` 다음에 추가:
+
+  ```tsx
+  setProjectCreateModalOpen(false);
+  ```
+
+- [ ] **Step 3: 기존 `ProjectRail` props를 drawer/modal 기준으로 바꾼다.**
+
+  교체할 props 형태:
+
+  ```tsx
+  <ProjectDrawer
+    deletingProjectId={deletingProjectId}
+    error={projectActionError}
+    onCreateClick={() => setProjectCreateModalOpen(true)}
+    onDeleteProject={deleteProject}
+    onMouseEnter={() => setProjectDrawerOpen(true)}
+    onProjectSelect={handleProjectSelect}
+    open={projectDrawerOpen}
+    projectLoadState={projectLoadState}
+    projects={projects}
+    selectedProjectId={selectedProjectId}
+  />
+
+  <ProjectCreateModal
+    canvasPreset={newCanvasPreset}
+    contentType={newContentType}
+    creatingProject={creatingProject}
+    name={newProjectName}
+    onCanvasPresetChange={setNewCanvasPreset}
+    onClose={() => setProjectCreateModalOpen(false)}
+    onContentTypeChange={setNewContentType}
+    onCreateProject={createProject}
+    onNameChange={setNewProjectName}
+    open={projectCreateModalOpen}
+  />
+  ```
+
+- [ ] **Step 4: `ProjectRail`을 `ProjectDrawer`로 이름과 markup을 바꾼다.**
+
+  drawer의 구조:
+
+  ```tsx
+  function ProjectDrawer({
+    deletingProjectId,
+    error,
+    onCreateClick,
+    onDeleteProject,
+    onMouseEnter,
+    onProjectSelect,
+    open,
+    projectLoadState,
+    projects,
+    selectedProjectId,
+  }: ProjectDrawerProps) {
+    return (
+      <aside
+        className="project-drawer"
+        data-open={open}
+        onMouseEnter={onMouseEnter}
+        aria-label={labels.projectList}
+      >
+        <div className="project-drawer-head">
+          <div>
+            <p className="eyebrow">Studio</p>
+            <h2>프로젝트</h2>
+          </div>
+          <button className="project-new-button" onClick={onCreateClick} type="button">
+            + New
+          </button>
+        </div>
+        <p className="project-drawer-status">{getProjectLoadMessage(projectLoadState, projects.length)}</p>
+        {error ? <p className="form-error" role="alert">{error}</p> : null}
+        <div className="project-row-list">
+          {projects.map((project) => {
+            const active = project.id === selectedProjectId;
+            return (
+              <div className="project-row" data-active={active} key={project.id}>
+                <button
+                  aria-current={active ? "page" : undefined}
+                  className="project-row-main"
+                  onClick={() => onProjectSelect(project.id)}
+                  type="button"
+                >
+                  <strong>{project.name}</strong>
+                  <span className="project-row-meta">
+                    <StudioChip>{contentTypeLabels[project.contentType]}</StudioChip>
+                    <StudioChip>{canvasPresetLabels[project.canvasPreset]}</StudioChip>
+                  </span>
+                </button>
+                <button
+                  aria-label={`${project.name} ${labels.deleteProject}`}
+                  className="project-row-delete"
+                  disabled={deletingProjectId === project.id}
+                  onClick={() => onDeleteProject(project)}
+                  type="button"
+                >
+                  {labels.deleteProject}
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      </aside>
+    );
+  }
+  ```
+
+- [ ] **Step 5: `ProjectCreateModal`을 추가한다.**
+
+  modal 구조:
+
+  ```tsx
+  function ProjectCreateModal({
+    canvasPreset,
+    contentType,
+    creatingProject,
+    name,
+    onCanvasPresetChange,
+    onClose,
+    onContentTypeChange,
+    onCreateProject,
+    onNameChange,
+    open,
+  }: ProjectCreateModalProps) {
+    if (!open) {
+      return null;
+    }
+
+    return (
+      <div className="project-modal-backdrop" role="presentation">
+        <form className="project-create-modal" onSubmit={onCreateProject}>
+          <div className="project-modal-head">
+            <h2>새 프로젝트 생성</h2>
+            <button aria-label="닫기" className="modal-close-button" onClick={onClose} type="button">
+              ×
+            </button>
+          </div>
+          <label className="field-stack">
+            {labels.projectName}
+            <Input
+              aria-label={labels.projectName}
+              onChange={(event) => onNameChange(event.target.value)}
+              placeholder={labels.projectNamePlaceholder}
+              value={name}
+            />
+          </label>
+          <label className="field-stack">
+            {labels.contentType}
+            <Select value={contentType} onValueChange={(value) => onContentTypeChange(value as ContentType)}>
+              <SelectTrigger aria-label={labels.contentType}>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="comic">{labels.comic}</SelectItem>
+                <SelectItem value="card-news">{labels.cardNews}</SelectItem>
+              </SelectContent>
+            </Select>
+          </label>
+          <label className="field-stack">
+            {labels.canvas}
+            <Select value={canvasPreset} onValueChange={(value) => onCanvasPresetChange(value as CanvasPreset)}>
+              <SelectTrigger aria-label={labels.canvas}>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="1:1">1:1</SelectItem>
+                <SelectItem value="4:5">4:5</SelectItem>
+                <SelectItem value="9:16">9:16</SelectItem>
+              </SelectContent>
+            </Select>
+          </label>
+          <div className="project-modal-actions">
+            <Button onClick={onClose} type="button" variant="secondary">
+              취소
+            </Button>
+            <Button disabled={creatingProject || name.trim().length === 0} type="submit">
+              {creatingProject ? labels.addingProject : "생성"}
+            </Button>
+          </div>
+        </form>
+      </div>
+    );
+  }
+  ```
+
+- [ ] **Step 6: drawer/modal CSS를 추가하고 inline form CSS를 제거 대상에서 분리한다.**
+
+  핵심 규격:
+
+  ```css
+  .project-drawer {
+    background: #f2f3f5;
+    border-right: 1px solid var(--app-border);
+    bottom: 0;
+    left: 72px;
+    padding: 28px 18px;
+    position: fixed;
+    top: 0;
+    transform: translateX(-100%);
+    transition: transform 180ms ease;
+    width: 280px;
+    z-index: 30;
+  }
+
+  .project-drawer[data-open="true"],
+  .app-side-rail:has(.app-side-link[href="/projects"]:hover) + .app-main .project-drawer {
+    transform: translateX(0);
+  }
+
+  .project-create-modal {
+    background: #ffffff;
+    border-radius: 12px;
+    box-shadow: var(--app-shadow-card);
+    display: grid;
+    gap: 18px;
+    padding: 28px;
+    width: min(420px, calc(100vw - 40px));
+  }
+  ```
+
+  CSS selector `:has()`는 필수로 의존하지 않는다. React state의 `data-open`이 primary 동작이다.
+
+- [ ] **Step 7: 검증한다.**
+
+  ```powershell
+  npm run typecheck
+  npm run lint
+  ```
+
+  기대 결과: 두 명령 모두 error 0.
+
+- [ ] **Step 8: 커밋한다.**
+
+  ```powershell
+  git add apps/studio/components/studio/studio-workbench.tsx apps/studio/app/styles.css
+  git commit -m "Add project drawer and create modal" -m "Moves New into the project drawer, replaces inline project creation with a rounded modal, and keeps project row delete on hover." -m "Constraint: project API and database schema unchanged." -m "Tested: npm run typecheck; npm run lint." -m "Co-authored-by: OmX <omx@oh-my-codex.dev>"
+  ```
 
 수용 기준:
 
-- 왼쪽 열에서 프로젝트 생성이 가능하다.
-- 콘텐츠 유형과 캔버스가 분리된 dropdown이다.
-- 프로젝트 목록은 chip metadata를 사용한다.
-- 프로젝트 검색이 없다.
-- hover/focus 시 삭제 버튼이 보인다.
+- `New`는 기본 side rail에 없다.
+- 프로젝트 drawer 안에만 `+ New`가 있다.
+- `+ New` 클릭 시 radius 있는 modal이 열린다.
+- 프로젝트 생성 후 modal이 닫히고 생성된 프로젝트가 선택된다.
+- 프로젝트 목록은 카드가 아니라 row list로 보인다.
 
 ---
 
-## Task 3: 중앙 Production Panel 구현
+## Task 3: Workbench 본문을 카드가 아닌 분할형 구조로 재정렬
 
-**파일:**
+**Files:**
 
-- 수정: `apps/studio/components/studio/studio-workbench.tsx`
-- 수정: `apps/studio/app/styles.css`
+- Modify: `apps/studio/components/studio/studio-workbench.tsx`
+- Modify: `apps/studio/app/styles.css`
 
-- [ ] `createCut`, `deleteCut`, `patchCut`, `updateSelectedCut`, `increaseCutCount`, `decreaseCutCount` helper를 구현한다.
-- [ ] `ProductionPanel` component를 추가한다.
-- [ ] 프로젝트 context 영역에 프로젝트 이름과 chip을 표시한다.
-- [ ] 카드뉴스 프로젝트에서만 `전체 시나리오`와 `한 번에 제작`을 표시한다.
-- [ ] 인스타툰 프로젝트에서는 전체 시나리오 영역을 숨긴다.
-- [ ] 중앙 하단을 `CutList`와 `CutEditor`로 나눈다.
-- [ ] `CutList`에 컷 수 컨트롤을 표시한다.
-- [ ] 컷 수 `+`, `-`는 border 없는 icon-only control로 표시한다.
-- [ ] 컷 목록 행은 `#1 첫 장면`처럼 주 정보만 표시한다.
-- [ ] `생성 이미지`, `Mock 이미지`, `이미지 없음` 같은 부제목을 표시하지 않는다.
-- [ ] `CutEditor`에 컷 시나리오, 자막, 대사, 이미지 프롬프트를 표시한다.
-- [ ] placeholder는 충분히 읽히는 회색으로 맞춘다.
-- [ ] styles.css에 중앙 panel, batch panel, cut list, cut editor style을 추가한다.
-- [ ] 검증: `npm run typecheck`, `npm run lint`
-- [ ] 커밋: `Build studio production panel`
+- [ ] **Step 1: Workbench 최상위 markup을 `page-shell` 중심에서 split-only shell로 바꾼다.**
+
+  현재:
+
+  ```tsx
+  <section className="split-layout workspace-layout studio-workbench-layout" aria-label={labels.workbenchAria}>
+  ```
+
+  변경:
+
+  ```tsx
+  <section className="studio-workbench-shell" aria-label={labels.workbenchAria}>
+    <div className="studio-workbench-head">
+      ...
+    </div>
+    <div className="studio-workbench-grid">
+      ...
+    </div>
+  </section>
+  ```
+
+- [ ] **Step 2: Workbench head를 `ProductionPanel` 밖으로 끌어올린다.**
+
+  head에 표시:
+
+  ```tsx
+  <p className="eyebrow">{labels.workbench}</p>
+  <h1>{projectName || labels.selectProject}</h1>
+  <span className="project-context-chips">
+    <StudioChip>{contentTypeLabels[contentType]}</StudioChip>
+    <StudioChip>{canvasPresetLabels[canvasPreset]}</StudioChip>
+    <StudioChip>{getSaveLabel(saveState)}</StudioChip>
+  </span>
+  {selectedProject ? (
+    <button className="workbench-delete-button" onClick={() => deleteProject(selectedProject)} type="button">
+      {labels.deleteProject}
+    </button>
+  ) : null}
+  ```
+
+- [ ] **Step 3: `ProductionPanel`에서는 head를 제거하고 실제 입력 영역만 남긴다.**
+
+  `ProductionPanelProps`에서 `projectName`, `saveState`, `canvasPreset`, `contentType`가 head 전용으로만 쓰이면 제거한다.
+
+- [ ] **Step 4: 본문 grid는 `컷 수 / 컷 세부설정 / 이미지 미리보기` 3분할로 구성한다.**
+
+  적용 형태:
+
+  ```tsx
+  <div className="studio-workbench-grid">
+    <CutList ... />
+    <ProductionPanel ... />
+    <ImagePreviewPanel ... />
+  </div>
+  ```
+
+  `ProductionPanel` 안의 `production-detail-grid`는 제거한다.
+
+- [ ] **Step 5: 미리보기는 head 아래에만 위치하게 한다.**
+
+  `ImagePreviewPanel`은 `studio-workbench-grid` 세 번째 열로 이동하고, CSS에서 margin/pull-up/negative positioning을 사용하지 않는다.
+
+- [ ] **Step 6: split-only CSS를 적용한다.**
+
+  핵심 규격:
+
+  ```css
+  .studio-workbench-shell {
+    margin: 0 auto;
+    max-width: 1180px;
+    padding: 80px 32px 56px;
+  }
+
+  .studio-workbench-grid {
+    align-items: start;
+    display: grid;
+    gap: 28px;
+    grid-template-columns: minmax(140px, 180px) minmax(320px, 1fr) minmax(320px, 420px);
+  }
+
+  .production-cut-list,
+  .production-panel,
+  .image-preview-panel {
+    background: transparent;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+    padding: 0;
+  }
+  ```
+
+- [ ] **Step 7: 기존 카드형 Workbench class 사용을 제거한다.**
+
+  제거 대상:
+
+  - `.split-layout`를 Workbench shell layout에 의존하는 사용
+  - `.split-content`를 Workbench card처럼 쓰는 사용
+  - `.workspace-layout`를 Workbench grid로 쓰는 사용
+  - `.project-rail-form`
+  - `.project-rail`
+
+- [ ] **Step 8: 검증한다.**
+
+  ```powershell
+  npm run typecheck
+  npm run lint
+  ```
+
+  기대 결과: 두 명령 모두 error 0.
+
+- [ ] **Step 9: 커밋한다.**
+
+  ```powershell
+  git add apps/studio/components/studio/studio-workbench.tsx apps/studio/app/styles.css
+  git commit -m "Restructure workbench split layout" -m "Moves the workbench head above the editor grid and lays out cut count, cut settings, and image preview as split columns instead of cards." -m "Constraint: keep Gemini, cut persistence, and export behavior unchanged." -m "Tested: npm run typecheck; npm run lint." -m "Co-authored-by: OmX <omx@oh-my-codex.dev>"
+  ```
 
 수용 기준:
 
-- 카드뉴스와 인스타툰의 노출 조건이 다르다.
-- 컷 수 버튼에 border가 없다.
-- 컷 목록에 이미지 상태 부제목이 없다.
-- 중앙에서 컷별 입력을 편집할 수 있다.
+- 본문은 카드형 panel 반복이 아니라 세로 분할과 열 분할로 보인다.
+- 전체 컨테이너는 1180px 기준이다.
+- Workbench head 아래에 입력 영역과 미리보기가 있다.
+- 프로젝트 삭제는 Workbench head 보조 액션으로 보인다.
 
 ---
 
-## Task 4: 현재 컷 이미지 생성과 한 번에 제작 연결
+## Task 4: 단일 Chip Component와 컷 목록 시각 규칙 정리
 
-**파일:**
+**Files:**
 
-- 수정: `apps/studio/components/studio/studio-workbench.tsx`
-- 수정: `apps/studio/app/styles.css`
+- Modify: `apps/studio/components/studio/studio-workbench.tsx`
+- Modify: `apps/studio/app/styles.css`
 
-- [ ] `saveEditableCut` helper를 추가한다.
-- [ ] `generateImageForCut` helper를 추가한다.
-  - `localStorage`에서 Gemini API key 로드
-  - Assets 설정 로드
-  - POST `/api/images/generate`
-  - 성공 시 `imageDataUrl`, `imageStatus: "generated"` 저장
-  - 실패 시 사용자 메시지 표시
-- [ ] `generateSelectedCutImage`를 추가한다.
-- [ ] `이미지 생성` 버튼을 중앙 `이미지 프롬프트` 아래에 둔다.
-- [ ] 이미지 생성 요청에는 컷 시나리오, 자막, 대사, 이미지 프롬프트가 모두 포함되게 한다.
-- [ ] 자막과 대사는 이미지 안에 글자를 그리는 지시가 아니라 context로 사용한다.
-- [ ] `buildCardNewsInOnePass`를 구현한다.
-  - 카드뉴스에서만 동작
-  - 전체 시나리오를 현재 컷 수에 맞게 분할
-  - 부족한 컷 생성
-  - 각 컷의 scenario/caption/dialogue/imagePrompt 저장
-  - 각 컷 이미지를 Gemini route로 순차 생성
-  - 진행 상태를 `n/total`로 표시
-- [ ] 병렬 Gemini 호출을 만들지 않는다.
-- [ ] `splitScenario`, `limitExpressionReferences`, `getImageGenerationErrorMessage`, `getStatusMessageClass` helper를 추가한다.
-- [ ] styles.css에 `studio-generate-row`를 추가한다.
-- [ ] 검증: `npm run typecheck`, `npm run lint`
-- [ ] 커밋: `Wire studio image generation actions`
+- [ ] **Step 1: `StudioChip` className을 `.ui-chip`로 바꾼다.**
+
+  ```tsx
+  function StudioChip({ children }: StudioChipProps) {
+    return <span className="ui-chip">{children}</span>;
+  }
+  ```
+
+- [ ] **Step 2: `.studio-chip` CSS를 `.ui-chip`로 이동하고 `.studio-chip` 사용을 제거한다.**
+
+  단일 chip CSS:
+
+  ```css
+  .ui-chip {
+    align-items: center;
+    background: rgba(0, 113, 227, 0.1);
+    border: 0;
+    border-radius: 999px;
+    color: var(--app-blue);
+    display: inline-flex;
+    font-size: 12px;
+    font-weight: 500;
+    line-height: 1;
+    min-height: 24px;
+    padding: 0 8px;
+    white-space: nowrap;
+  }
+  ```
+
+- [ ] **Step 3: eyebrow 전역 규칙을 14px regular로 고정한다.**
+
+  ```css
+  .eyebrow {
+    color: var(--app-text-secondary);
+    font-size: 14px;
+    font-weight: 400;
+    letter-spacing: 0;
+    line-height: 1.4;
+    margin: 0;
+    text-transform: none;
+  }
+  ```
+
+- [ ] **Step 4: 컷 수 텍스트 규칙을 맞춘다.**
+
+  ```css
+  .cut-count-stepper span,
+  .cut-count-stepper strong,
+  .cut-ready-label {
+    font-size: 16px;
+    font-weight: 500;
+  }
+  ```
+
+- [ ] **Step 5: 컷 수 `+`, `-`는 border 없는 icon-only로 유지한다.**
+
+  ```css
+  .cut-count-stepper button {
+    background: transparent;
+    border: 0;
+    box-shadow: none;
+    color: var(--app-blue);
+    height: 32px;
+    width: 32px;
+  }
+  ```
+
+- [ ] **Step 6: 컷 목록 row에서 부제목이 렌더링되지 않는지 확인한다.**
+
+  유지할 형태:
+
+  ```tsx
+  <button className="cut-row" ...>
+    <strong>#{cut.position} {getCutTitle(cut)}</strong>
+  </button>
+  ```
+
+- [ ] **Step 7: placeholder 색상을 입력값보다 낮은 대비로 맞춘다.**
+
+  ```css
+  input::placeholder,
+  textarea::placeholder {
+    color: #a8a8ae;
+  }
+  ```
+
+- [ ] **Step 8: 검증한다.**
+
+  ```powershell
+  npm run typecheck
+  npm run lint
+  ```
+
+  기대 결과: 두 명령 모두 error 0.
+
+- [ ] **Step 9: 커밋한다.**
+
+  ```powershell
+  git add apps/studio/components/studio/studio-workbench.tsx apps/studio/app/styles.css
+  git commit -m "Unify workbench metadata chips" -m "Consolidates metadata chips into one ui-chip style and tightens cut count, eyebrow, placeholder, and cut row rules." -m "Constraint: visual-only cleanup; no data or provider behavior changes." -m "Tested: npm run typecheck; npm run lint." -m "Co-authored-by: OmX <omx@oh-my-codex.dev>"
+  ```
 
 수용 기준:
 
-- `이미지 생성`은 중앙의 이미지 프롬프트 아래에 있다.
-- API key가 없으면 provider 호출 없이 안내 메시지를 표시한다.
-- `한 번에 제작`은 카드뉴스에서만 보인다.
-- `한 번에 제작`은 Gemini 호출을 순차로 수행한다.
+- chip은 `.ui-chip` 한 형태로만 관리된다.
+- chip마다 다른 radius, shadow, border가 없다.
+- eyebrow는 14px regular로 통일된다.
+- 컷 목록에는 이미지 상태 부제목이 없다.
 
 ---
 
-## Task 5: 오른쪽 Image-only Preview와 Export 유지
+## Task 5: 이미지 생성 UX와 미리보기 위치를 최신 스펙에 맞게 고정
 
-**파일:**
+**Files:**
 
-- 수정: `apps/studio/components/studio/studio-workbench.tsx`
-- 수정: `apps/studio/app/styles.css`
+- Modify: `apps/studio/components/studio/studio-workbench.tsx`
+- Modify: `apps/studio/app/styles.css`
 
-- [ ] `ImagePreviewPanel` component를 추가한다.
-- [ ] 오른쪽 preview는 생성 이미지 결과만 표시한다.
-- [ ] preview placeholder는 회색 텍스트로 표시한다.
-- [ ] 오른쪽 preview에 자막/대사 텍스트 레이어를 표시하지 않는다.
-- [ ] 오른쪽 preview에 `현재 컷 PNG`, `전체 ZIP` 액션을 둔다.
-- [ ] 기존 export 호환을 위해 숨겨진 `CutExportCanvas`를 추가한다.
-- [ ] 기존 `workspace-editor.tsx`의 export helper를 필요한 범위에서 복사한다.
-  - `applyExportFontVariables`
-  - `downloadDataUrl`
-  - `downloadBlob`
-  - `dataUrlToBlob`
+- [ ] **Step 1: `이미지 생성` 버튼이 `이미지 프롬프트` 아래에만 있는지 확인한다.**
+
+  유지할 구조:
+
+  ```tsx
+  <label className="field-stack">
+    {labels.imagePrompt}
+    <textarea ... />
+  </label>
+  <div className="editor-action-row">
+    <Button ...>{labels.generateImage}</Button>
+  </div>
+  ```
+
+- [ ] **Step 2: `ImagePreviewPanel`에 자막/대사 렌더링이 없는지 확인한다.**
+
+  유지할 구조:
+
+  ```tsx
+  <div className={`image-preview-canvas ${getCanvasRatioClass(canvasPreset)}`}>
+    {hasImage ? <div className="image-preview-art" /> : null}
+    {!hasImage ? <p>{labels.imagePreviewPlaceholder}</p> : null}
+  </div>
+  ```
+
+- [ ] **Step 3: 미리보기 placeholder를 회색 background로만 표현한다.**
+
+  ```css
+  .image-preview-canvas {
+    background: #ededf0;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+  }
+  ```
+
+- [ ] **Step 4: export용 hidden canvas는 기존 HTML/CSS 레이어를 유지한다.**
+
+  유지:
+
+  - `CutExportCanvas`
+  - `downloadCurrentCut`
+  - `downloadAllCutsZip`
   - `createCutHtmlDocument`
-  - `safeFileName`
-  - `escapeHtml`
-- [ ] `downloadCurrentCut`, `downloadAllCutsZip`를 Workbench에 연결한다.
-- [ ] styles.css에 image preview와 export action style을 추가한다.
-- [ ] 검증: `npm run typecheck`, `npm run lint`
-- [ ] 커밋: `Add studio image preview and export actions`
+
+- [ ] **Step 5: `한 번에 제작`은 카드뉴스에서만 보이게 유지한다.**
+
+  유지할 조건:
+
+  ```tsx
+  const isCardNews = selectedProject?.contentType === "card-news";
+  {isCardNews ? <section className="full-scenario-panel">...</section> : null}
+  ```
+
+- [ ] **Step 6: Gemini 자동 호출이 없는지 확인한다.**
+
+  확인 기준:
+
+  - `generateSelectedCutImage`는 버튼 클릭 handler에서만 호출된다.
+  - `buildCardNewsInOnePass`는 `한 번에 제작` 버튼 클릭 handler에서만 호출된다.
+  - `useEffect` 안에서 Gemini route를 호출하지 않는다.
+
+- [ ] **Step 7: 검증한다.**
+
+  ```powershell
+  npm run typecheck
+  npm run lint
+  ```
+
+  기대 결과: 두 명령 모두 error 0.
+
+- [ ] **Step 8: 커밋한다.**
+
+  ```powershell
+  git add apps/studio/components/studio/studio-workbench.tsx apps/studio/app/styles.css
+  git commit -m "Align workbench generation preview UX" -m "Keeps generation actions in the input column and preserves an image-only preview while export canvases retain text layers." -m "Constraint: no automatic provider calls and no API key persistence changes." -m "Tested: npm run typecheck; npm run lint." -m "Co-authored-by: OmX <omx@oh-my-codex.dev>"
+  ```
 
 수용 기준:
 
-- 오른쪽 preview는 image-only다.
-- 자막과 대사는 오른쪽 preview에 노출되지 않는다.
-- PNG/ZIP export는 기존 방식과 호환된다.
+- 대사와 자막은 미리보기 화면에 보이지 않는다.
+- 자막과 대사는 Gemini payload context로만 사용된다.
+- 이미지 미리보기는 회색 placeholder 또는 생성 이미지 중심이다.
+- export 기능은 기존 HTML/CSS 텍스트 레이어 호환을 유지한다.
 
 ---
 
-## Task 6: 반응형 스타일과 브라우저 검증
+## Task 6: 반응형, 브라우저 QA, 최종 커밋
 
-**파일:**
+**Files:**
 
-- 수정: `apps/studio/app/styles.css`
-- 필요 시 수정: `apps/studio/components/studio/studio-workbench.tsx`
+- Modify: `apps/studio/app/styles.css`
+- Modify: `apps/studio/components/studio/studio-workbench.tsx`
 
-- [ ] 데스크톱 3열 layout을 안정화한다.
-- [ ] 1180px 이하에서 preview가 아래로 내려가도록 조정한다.
-- [ ] 760px 이하에서 Projects, Production Input, Preview를 세로로 쌓는다.
-- [ ] 모바일에서 가로 overflow가 없도록 한다.
-- [ ] chip, 버튼, 긴 한국어 텍스트가 겹치지 않게 한다.
-- [ ] 정적 검증을 실행한다.
-  - `npm run typecheck`
-  - `npm run lint`
-  - `npm run build`
-- [ ] 브라우저 검증을 실행한다.
-  - `http://127.0.0.1:4001/projects`
-  - `http://127.0.0.1:4001/workspace/[projectId]`
-  - `http://127.0.0.1:4001/assets`
-- [ ] 데스크톱 확인 기준:
+- [ ] **Step 1: 데스크톱 layout을 1180px 컨테이너로 확인한다.**
+
+  CSS 기준:
+
+  ```css
+  .studio-workbench-shell {
+    max-width: 1180px;
+  }
+  ```
+
+- [ ] **Step 2: 1180px 이하에서 grid가 자연스럽게 2열 또는 1열로 접히게 한다.**
+
+  ```css
+  @media (max-width: 1180px) {
+    .studio-workbench-grid {
+      grid-template-columns: minmax(150px, 200px) minmax(0, 1fr);
+    }
+
+    .image-preview-panel {
+      grid-column: 2;
+    }
+  }
+  ```
+
+- [ ] **Step 3: 760px 이하에서 모든 영역을 세로로 쌓는다.**
+
+  ```css
+  @media (max-width: 760px) {
+    .app-main {
+      padding-left: 0;
+      padding-top: 72px;
+    }
+
+    .app-side-rail {
+      bottom: auto;
+      flex-direction: row;
+      height: 72px;
+      right: 0;
+      width: auto;
+    }
+
+    .project-drawer {
+      left: 0;
+      top: 72px;
+      width: min(320px, 100vw);
+    }
+
+    .studio-workbench-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .image-preview-panel {
+      grid-column: auto;
+    }
+  }
+  ```
+
+- [ ] **Step 4: 정적 검증을 실행한다.**
+
+  ```powershell
+  npm run typecheck
+  npm run lint
+  npm run build
+  ```
+
+  기대 결과: 세 명령 모두 error 0.
+
+- [ ] **Step 5: 개발 서버를 4001 포트로 실행한다.**
+
+  ```powershell
+  npm run dev -- --port 4001
+  ```
+
+  기대 결과: `http://127.0.0.1:4001`에서 Next dev server가 열린다.
+
+- [ ] **Step 6: 브라우저에서 `/projects`를 검증한다.**
+
+  확인 항목:
+
   - console error 0
-  - nav는 `Studio`, `Assets`
-  - `/projects`에서 3열 Workbench 표시
-  - 프로젝트 검색 없음
-  - 프로젝트 추가 form의 콘텐츠 유형/캔버스 dropdown 분리
-  - 프로젝트 목록 chip 표시
-  - 프로젝트 삭제 hover/focus 표시
-  - 카드뉴스에서 `전체 시나리오`, `한 번에 제작` 표시
-  - 인스타툰에서 full scenario batch 영역 미노출
-  - 컷 수 `+`, `-` border 없음
-  - 컷 목록 부제목 없음
-  - `이미지 생성`이 중앙 `이미지 프롬프트` 아래 있음
-  - 오른쪽 preview에 자막/대사 텍스트 없음
-  - preview placeholder 회색 가독성 확보
-- [ ] 모바일 확인 기준:
-  - horizontal overflow 없음
-  - 세 영역이 자연스럽게 stacked layout으로 전환
-  - icon-only cut control이 터치 가능
-- [ ] Gemini 실제 호출은 사용자가 명시하지 않는 한 하지 않는다.
-- [ ] API key가 없는 상태에서 `이미지 생성`을 눌렀을 때 provider 호출 없이 API key 필요 메시지가 보이는지 확인한다.
-- [ ] 최종 커밋: `Refine studio workbench responsive UI`
+  - side rail에 로고 자리, 수평 라인, `프로젝트`, `에셋` 표시
+  - side rail에 `New` 없음
+  - 프로젝트 drawer에 `+ New` 표시
+  - `+ New` 클릭 시 modal 표시
+  - modal radius 적용
+  - 프로젝트 row는 카드처럼 보이지 않음
+  - chip 형태가 모두 동일
+
+- [ ] **Step 7: 브라우저에서 `/workspace/[projectId]`를 검증한다.**
+
+  확인 항목:
+
+  - deep link가 같은 Workbench를 열고 해당 프로젝트를 선택
+  - Workbench head 아래에 세 분할 영역 표시
+  - 미리보기가 head 영역 위로 올라오지 않음
+  - 카드뉴스에서 전체 시나리오와 `한 번에 제작` 표시
+  - 인스타툰에서 전체 시나리오 영역 미노출
+  - `이미지 생성` 버튼이 이미지 프롬프트 아래에 있음
+  - preview에 자막/대사 텍스트 없음
+
+- [ ] **Step 8: 브라우저에서 `/assets`를 검증한다.**
+
+  확인 항목:
+
+  - side rail이 assets route에서도 보임
+  - `에셋` 메뉴 active state 표시
+  - 기존 Assets 세부 메뉴와 입력 화면이 깨지지 않음
+
+- [ ] **Step 9: 최종 커밋한다.**
+
+  최종 QA 중 CSS 보정이 발생했을 때만 실행:
+
+  ```powershell
+  git add apps/studio/app/styles.css apps/studio/components/studio/studio-workbench.tsx
+  git commit -m "Polish workbench responsive layout" -m "Finalizes responsive side rail, project drawer, split workbench, and image preview layout after browser QA." -m "Constraint: visual and layout polish only; project data, provider routes, and export structure unchanged." -m "Tested: npm run typecheck; npm run lint; npm run build; browser QA on /projects, /workspace/[projectId], and /assets." -m "Co-authored-by: OmX <omx@oh-my-codex.dev>"
+  ```
 
 수용 기준:
 
-- 정적 검증이 모두 통과한다.
-- 브라우저 검증에서 console error가 없다.
-- 데스크톱/모바일에서 텍스트와 버튼이 겹치지 않는다.
+- 데스크톱과 모바일 폭에서 UI 요소가 겹치지 않는다.
+- console error가 없다.
+- provider 호출은 사용자 클릭 없이는 발생하지 않는다.
+- API key가 파일, DB, git diff, 로그에 남지 않는다.
+- export PNG/ZIP 액션이 유지된다.
 
 ---
 
-## 자체 점검
+## Self-Review
 
-설계 반영:
-
-- 단일 Workbench: Task 1
-- 프로젝트 rail: Task 2
-- 중앙 제작 입력: Task 3
-- 이미지 생성과 한 번에 제작: Task 4
-- image-only preview와 export: Task 5
-- 반응형과 브라우저 검증: Task 6
-
-범위 제외:
-
-- Genspark식 직접 preview 요소 편집은 v2로 유지한다.
-- 다크 모드는 제외한다.
-- DB schema와 localStorage key는 바꾸지 않는다.
-
-리스크:
-
-- `한 번에 제작`은 컷 수만큼 Gemini를 순차 호출하므로 실제 호출은 비용/쿼터를 고려해야 한다.
-- 기존 export는 HTML/CSS layer를 유지한다. 화면 preview는 image-only지만 export까지 image-only로 바꾸려면 별도 제품 결정이 필요하다.
+- 스펙의 카드형 UI 금지는 Task 3과 Task 6에서 분할형 layout으로 반영한다.
+- 사이드바 로고 자리와 로고 아래 수평 라인은 Task 1에서 반영한다.
+- `New`를 side rail에서 제거하고 프로젝트 drawer 안으로 이동하는 요구는 Task 2에서 반영한다.
+- 생성 modal radius 요구는 Task 2에서 `12px` modal로 반영한다.
+- chip 단일화 요구는 Task 4에서 `.ui-chip` 단일 규격으로 반영한다.
+- 전체 시나리오는 카드뉴스에서만 보이고 Gemini 호출은 명시 클릭에서만 수행한다는 요구는 Task 5에서 검증한다.
+- `/projects`, `/workspace/[projectId]`, `/assets` 검증은 Task 6에 포함한다.
+- 데이터 모델, DB schema, API route, export 구조는 수정 대상에서 제외했다.

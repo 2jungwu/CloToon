@@ -23,7 +23,6 @@ const cut: ImageGenerationCut = {
   caption: "Unexpected message",
   dialogue: "What is this?",
   imagePrompt: "soft editorial webtoon composition, curious expression",
-  negativePrompt: "dark horror mood, extra fingers",
 };
 
 const assets: ImageGenerationAssets = {
@@ -54,5 +53,6 @@ test("buildImageGenerationPrompt combines assets and cut context while banning r
   assert.match(prompt, /Unexpected message/);
   assert.match(prompt, /What is this/);
   assert.match(prompt, /1:1 square canvas/);
+  assert.match(prompt, /Quality guardrails/);
   assert.match(prompt, /No readable text, captions, speech bubbles, Korean lettering, UI text, subtitles, or dialogue/);
 });

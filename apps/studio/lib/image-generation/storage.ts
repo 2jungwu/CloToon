@@ -1,5 +1,6 @@
 import type { ImageGenerationAssets, ImageGenerationCharacter } from "@/lib/image-generation/types";
 import { isAllowedReferenceImageDataUrl } from "@/lib/cuts/image-data-url";
+import { normalizeGeminiImageModel } from "@/lib/image-generation/models";
 
 export const assetsStorageKey = "local-studio-assets";
 export const settingsStorageKey = "local-studio-settings";
@@ -13,6 +14,11 @@ const defaultCharacterMarkdown = `# clo
 export function loadGeminiApiKeyFromStorage(storage: Storage) {
   const value = readStorageJson(storage, settingsStorageKey);
   return isRecord(value) ? getString(value.geminiApiKey, "") : "";
+}
+
+export function loadGeminiImageModelFromStorage(storage: Storage) {
+  const value = readStorageJson(storage, settingsStorageKey);
+  return isRecord(value) ? normalizeGeminiImageModel(value.geminiModel) : normalizeGeminiImageModel(null);
 }
 
 export function loadImageGenerationAssetsFromStorage(storage: Storage): ImageGenerationAssets {

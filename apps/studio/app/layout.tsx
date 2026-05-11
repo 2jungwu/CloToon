@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import Link from "next/link";
 import "./styles.css";
 import { AppNav } from "@/components/app-nav";
 
@@ -19,15 +18,8 @@ export default function RootLayout({
   return (
     <html lang="ko" className="font-sans">
       <body>
-        <header className="app-header">
-          <div className="app-header-inner">
-            <Link href="/projects" className="brand">
-              CloToon
-            </Link>
-            <AppNav />
-          </div>
-        </header>
-        <main>{children}</main>
+        <AppNav />
+        <main className="app-main">{children}</main>
       </body>
     </html>
   );
