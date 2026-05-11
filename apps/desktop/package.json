@@ -1,0 +1,46 @@
+{
+  "name": "@local-comic-card-studio/desktop",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Windows desktop wrapper for CloToon local studio.",
+  "main": "main.cjs",
+  "scripts": {
+    "prepare:resources": "node scripts/prepare-resources.cjs",
+    "pack": "electron-builder --dir --win portable --x64",
+    "dist": "electron-builder --win portable --x64"
+  },
+  "build": {
+    "appId": "local.clotoon.studio",
+    "productName": "CloToon",
+    "electronVersion": "42.0.1",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "main.cjs",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "resources",
+        "to": "resources"
+      }
+    ],
+    "asar": true,
+    "win": {
+      "target": [
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "artifactName": "CloToon-${version}-win-${arch}.${ext}"
+    }
+  },
+  "devDependencies": {
+    "electron": "42.0.1",
+    "electron-builder": "26.8.1"
+  }
+}

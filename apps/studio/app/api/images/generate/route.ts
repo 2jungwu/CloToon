@@ -12,6 +12,7 @@ import {
   GEMINI_IMAGE_MODEL,
   getSelectedCharacter,
 } from "@/lib/image-generation/prompt-builder";
+import { rejectInvalidDesktopMutation } from "@/lib/security/desktop-request-guard";
 
 export const runtime = "nodejs";
 export const maxDuration = 120;
@@ -97,6 +98,12 @@ type GeminiResponseBody = {
 };
 
 export async function POST(request: Request) {
+  const blockedResponse = rejectInvalidDesktopMutation(request);
+
+  if (blockedResponse) {
+    return blockedResponse;
+  }
+
   const body = await readJsonPayload(request);
 
   if (!body.ok) {

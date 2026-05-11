@@ -5,6 +5,7 @@ out/
 apps/*/out/
 dist/
 apps/*/dist/
+apps/desktop/resources/
 coverage/
 artifacts/
 .worktrees/

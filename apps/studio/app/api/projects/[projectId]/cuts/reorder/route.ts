@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { reorderCuts } from "@/lib/cuts/repository";
 import { getProject } from "@/lib/projects/repository";
+import { rejectInvalidDesktopMutation } from "@/lib/security/desktop-request-guard";
 
 export const runtime = "nodejs";
 
@@ -16,6 +17,12 @@ const reorderSchema = z.object({
 });
 
 export async function POST(request: Request, { params }: ReorderRouteProps) {
+  const blockedResponse = rejectInvalidDesktopMutation(request);
+
+  if (blockedResponse) {
+    return blockedResponse;
+  }
+
   const { projectId } = await params;
   const body = await request.json().catch(() => null);
   const result = reorderSchema.safeParse(body);

@@ -12,6 +12,9 @@
     "start": "npm --workspace @local-comic-card-studio/studio run start",
     "lint": "npm --workspace @local-comic-card-studio/studio run lint",
     "test": "npm --workspace @local-comic-card-studio/studio run test",
-    "typecheck": "npm --workspace @local-comic-card-studio/studio run typecheck"
+    "typecheck": "npm --workspace @local-comic-card-studio/studio run typecheck",
+    "desktop:prepare": "npm run build && npm --workspace @local-comic-card-studio/desktop run prepare:resources",
+    "desktop:pack": "npm run desktop:prepare && npm --workspace @local-comic-card-studio/desktop run pack",
+    "desktop:dist": "npm run desktop:prepare && npm --workspace @local-comic-card-studio/desktop run dist"
   }
 }

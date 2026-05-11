@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { createCut, duplicateCut, listCuts } from "@/lib/cuts/repository";
 import { getProject } from "@/lib/projects/repository";
+import { rejectInvalidDesktopMutation } from "@/lib/security/desktop-request-guard";
 
 export const runtime = "nodejs";
 
@@ -32,6 +33,12 @@ export async function GET(_request: Request, { params }: CutsRouteProps) {
 }
 
 export async function POST(request: Request, { params }: CutsRouteProps) {
+  const blockedResponse = rejectInvalidDesktopMutation(request);
+
+  if (blockedResponse) {
+    return blockedResponse;
+  }
+
   const { projectId } = await params;
   const body = await request.json().catch(() => null);
   const result = createCutSchema.safeParse(body);

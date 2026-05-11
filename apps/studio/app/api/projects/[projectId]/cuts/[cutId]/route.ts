@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { deleteCut, updateCut } from "@/lib/cuts/repository";
 import { isAllowedCutImageDataUrl, maxCutImageDataUrlLength } from "@/lib/cuts/image-data-url";
+import { rejectInvalidDesktopMutation } from "@/lib/security/desktop-request-guard";
 
 export const runtime = "nodejs";
 
@@ -28,6 +29,12 @@ const updateCutSchema = z.object({
 });
 
 export async function PATCH(request: Request, { params }: CutRouteProps) {
+  const blockedResponse = rejectInvalidDesktopMutation(request);
+
+  if (blockedResponse) {
+    return blockedResponse;
+  }
+
   const { projectId, cutId } = await params;
   const body = await request.json().catch(() => null);
   const result = updateCutSchema.safeParse(body);
@@ -48,7 +55,13 @@ export async function PATCH(request: Request, { params }: CutRouteProps) {
   return NextResponse.json({ cut });
 }
 
-export async function DELETE(_request: Request, { params }: CutRouteProps) {
+export async function DELETE(request: Request, { params }: CutRouteProps) {
+  const blockedResponse = rejectInvalidDesktopMutation(request);
+
+  if (blockedResponse) {
+    return blockedResponse;
+  }
+
   const { projectId, cutId } = await params;
   const deleted = deleteCut(projectId, cutId);
 
