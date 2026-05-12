@@ -4,6 +4,7 @@ import type { CSSProperties, FormEvent, KeyboardEvent, ReactNode, RefObject } fr
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toPng } from "html-to-image";
 import JSZip from "jszip";
+import dynamic from "next/dynamic";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -16,9 +17,18 @@ import {
 import { toCssImageUrl } from "@/lib/cuts/image-data-url";
 import {
   captionAlignments,
+  captionBorderWidthMax,
+  captionBoxHeightMax,
+  captionBoxHeightMin,
+  captionBoxWidthMax,
+  captionBoxWidthMin,
   captionFontSizeMax,
   captionFontSizeMin,
+  captionFontWeightMax,
+  captionFontWeightMin,
+  captionPaddingMax,
   captionPositions,
+  getCaptionPositionYPct,
   resolveCaptionStyle,
   type CaptionAlign,
   type CaptionPosition,
@@ -43,6 +53,26 @@ import {
 
 type StudioWorkbenchProps = {
   initialProjectId?: string;
+};
+
+const Moveable = dynamic(() => import("react-moveable"), { ssr: false });
+
+type CaptionMoveableDragEvent = {
+  target: HTMLElement | SVGElement;
+  transform: string;
+};
+
+type CaptionMoveableResizeEvent = {
+  drag: {
+    transform: string;
+  };
+  height: number;
+  target: HTMLElement | SVGElement;
+  width: number;
+};
+
+type CaptionMoveableEndEvent = {
+  target: HTMLElement | SVGElement;
 };
 
 type LoadState = "idle" | "loading" | "ready" | "error";
@@ -133,6 +163,15 @@ const labels = {
   captionAlignCenter: "\uc911\uc559",
   captionAlignRight: "\uc624\ub978\ucabd",
   captionFontSize: "\ud06c\uae30",
+  captionFontWeight: "\ub450\uaed8",
+  captionTextColor: "\uae00\uc790\uc0c9",
+  captionBackgroundColor: "\ubc30\uacbd\uc0c9",
+  captionBorderColor: "\ud14c\ub450\ub9ac\uc0c9",
+  captionBorderWidth: "\ud14c\ub450\ub9ac",
+  captionBoxWidth: "\ubc15\uc2a4 \ub108\ube44",
+  captionBoxHeight: "\ubc15\uc2a4 \ub192\uc774",
+  captionPaddingX: "\uc88c\uc6b0 \uc5ec\ubc31",
+  captionPaddingY: "\uc0c1\ud558 \uc5ec\ubc31",
   captionStyleReset: "\uae30\ubcf8\uac12",
   dialogue: "\ub300\uc0ac",
   dialoguePlaceholder: "\ub300\uc0ac \ub610\ub294 \ubcf8\ubb38\uc744 \uc785\ub825\ud558\uc138\uc694.",
@@ -939,6 +978,25 @@ export function StudioWorkbench({ initialProjectId }: StudioWorkbenchProps) {
     }, 350);
   }
 
+  function flushSelectedCutPatch() {
+    if (selectedCut) {
+      flushPendingCutPatch(selectedCut.id);
+    }
+  }
+
+  function updateSelectedCutCaptionStyle(patch: Partial<CaptionStyle>) {
+    if (!selectedCut) {
+      return;
+    }
+
+    updateSelectedCut({
+      captionStyleOverride: resolveCaptionStyle({
+        ...resolveCaptionStyle(selectedCut.captionStyleOverride),
+        ...patch,
+      }),
+    });
+  }
+
   function increaseCutCount() {
     if (!selectedProject || cutLoadState === "loading") {
       return;
@@ -1315,11 +1373,7 @@ export function StudioWorkbench({ initialProjectId }: StudioWorkbenchProps) {
                   generationMessage={generationMessage}
                   imageGenerationAssets={imageGenerationAssets}
                   onBuildCardNewsInOnePass={buildCardNewsInOnePass}
-                  onFlushSelectedCut={() => {
-                    if (selectedCut) {
-                      flushPendingCutPatch(selectedCut.id);
-                    }
-                  }}
+                  onFlushSelectedCut={flushSelectedCutPatch}
                   onGenerateSelectedCutImage={generateSelectedCutImage}
                   onFullScenarioChange={setFullScenario}
                   onUpdateSelectedCut={updateSelectedCut}
@@ -1334,6 +1388,8 @@ export function StudioWorkbench({ initialProjectId }: StudioWorkbenchProps) {
                   exportState={exportState}
                   fonts={studioPreferences.fonts}
                   canDownloadAllCutsZip={sortedCuts.length > 0}
+                  onCaptionStyleChange={updateSelectedCutCaptionStyle}
+                  onCaptionStyleCommit={flushSelectedCutPatch}
                   onDownloadAllCutsZip={downloadAllCutsZip}
                   onDownloadCurrentCut={downloadCurrentCut}
                   project={selectedProject}
@@ -1955,10 +2011,10 @@ function CutEditor({
       <CaptionStyleControls
         onChange={(patch) =>
           onUpdateSelectedCut({
-            captionStyleOverride: {
+            captionStyleOverride: resolveCaptionStyle({
               ...captionStyle,
               ...patch,
-            },
+            }),
           })
         }
         onCommit={onFlushSelectedCut}
@@ -2014,16 +2070,8 @@ function CaptionStyleControls({
   onReset,
   style,
 }: CaptionStyleControlsProps) {
-  function updateFontSize(value: string) {
-    const nextFontSize = Number.parseInt(value, 10);
-
-    if (Number.isNaN(nextFontSize)) {
-      return;
-    }
-
-    onChange({
-      fontSize: Math.min(Math.max(nextFontSize, captionFontSizeMin), captionFontSizeMax),
-    });
+  function updateCaptionStyle(patch: Partial<CaptionStyle>) {
+    onChange(resolveCaptionStyle({ ...style, ...patch }));
   }
 
   return (
@@ -2036,7 +2084,7 @@ function CaptionStyleControls({
               data-active={style.position === position}
               key={position}
               onBlur={onCommit}
-              onClick={() => onChange({ position })}
+              onClick={() => updateCaptionStyle({ position, yPct: getCaptionPositionYPct(position) })}
               type="button"
             >
               {captionPositionLabels[position]}
@@ -2053,7 +2101,7 @@ function CaptionStyleControls({
               data-active={style.align === align}
               key={align}
               onBlur={onCommit}
-              onClick={() => onChange({ align })}
+              onClick={() => updateCaptionStyle({ align })}
               type="button"
             >
               {captionAlignLabels[align]}
@@ -2062,26 +2110,92 @@ function CaptionStyleControls({
         </div>
       </div>
 
-      <label className="caption-font-size-control">
-        <span className="caption-style-label">{labels.captionFontSize}</span>
-        <input
+      <div className="caption-style-grid">
+        <CaptionRangeControl
+          label={labels.captionFontSize}
           max={captionFontSizeMax}
           min={captionFontSizeMin}
-          onBlur={onCommit}
-          onChange={(event) => updateFontSize(event.target.value)}
-          type="range"
+          onChange={(value) => updateCaptionStyle({ fontSize: value })}
+          onCommit={onCommit}
           value={style.fontSize}
         />
-        <input
-          className="caption-style-number"
-          max={captionFontSizeMax}
-          min={captionFontSizeMin}
-          onBlur={onCommit}
-          onChange={(event) => updateFontSize(event.target.value)}
-          type="number"
-          value={style.fontSize}
+        <CaptionRangeControl
+          label={labels.captionFontWeight}
+          max={captionFontWeightMax}
+          min={captionFontWeightMin}
+          onChange={(value) => updateCaptionStyle({ fontWeight: value })}
+          onCommit={onCommit}
+          step={100}
+          value={style.fontWeight}
         />
-      </label>
+        <CaptionRangeControl
+          label={labels.captionBoxWidth}
+          max={captionBoxWidthMax}
+          min={captionBoxWidthMin}
+          onChange={(value) => updateCaptionStyle({ widthPct: value })}
+          onCommit={onCommit}
+          suffix="%"
+          value={style.widthPct}
+        />
+        <CaptionRangeControl
+          label={labels.captionBoxHeight}
+          max={captionBoxHeightMax}
+          min={captionBoxHeightMin}
+          onChange={(value) => updateCaptionStyle({ heightPct: value })}
+          onCommit={onCommit}
+          suffix="%"
+          value={style.heightPct}
+        />
+        <CaptionRangeControl
+          label={labels.captionPaddingX}
+          max={captionPaddingMax}
+          min={0}
+          onChange={(value) => updateCaptionStyle({ paddingXPct: value })}
+          onCommit={onCommit}
+          step={0.5}
+          suffix="%"
+          value={style.paddingXPct}
+        />
+        <CaptionRangeControl
+          label={labels.captionPaddingY}
+          max={captionPaddingMax}
+          min={0}
+          onChange={(value) => updateCaptionStyle({ paddingYPct: value })}
+          onCommit={onCommit}
+          step={0.5}
+          suffix="%"
+          value={style.paddingYPct}
+        />
+        <CaptionRangeControl
+          label={labels.captionBorderWidth}
+          max={captionBorderWidthMax}
+          min={0}
+          onChange={(value) => updateCaptionStyle({ borderWidth: value })}
+          onCommit={onCommit}
+          value={style.borderWidth}
+        />
+      </div>
+
+      <div className="caption-color-grid">
+        <CaptionColorControl
+          label={labels.captionTextColor}
+          onChange={(value) => updateCaptionStyle({ color: value })}
+          onCommit={onCommit}
+          value={style.color}
+        />
+        <CaptionColorControl
+          label={labels.captionBackgroundColor}
+          onChange={(value) => updateCaptionStyle({ backgroundColor: value })}
+          onCommit={onCommit}
+          value={style.backgroundColor}
+        />
+        <CaptionColorControl
+          label={labels.captionBorderColor}
+          onChange={(value) => updateCaptionStyle({ borderColor: value })}
+          onCommit={onCommit}
+          value={style.borderColor}
+        />
+      </div>
 
       <button
         className="caption-style-reset"
@@ -2095,12 +2209,105 @@ function CaptionStyleControls({
   );
 }
 
+type CaptionRangeControlProps = {
+  label: string;
+  max: number;
+  min: number;
+  onChange: (value: number) => void;
+  onCommit: () => void;
+  step?: number;
+  suffix?: string;
+  value: number;
+};
+
+function CaptionRangeControl({
+  label,
+  max,
+  min,
+  onChange,
+  onCommit,
+  step = 1,
+  suffix = "",
+  value,
+}: CaptionRangeControlProps) {
+  function updateValue(value: string) {
+    const parsedValue = Number.parseFloat(value);
+
+    if (!Number.isFinite(parsedValue)) {
+      return;
+    }
+
+    onChange(parsedValue);
+  }
+
+  return (
+    <label className="caption-range-control">
+      <span className="caption-style-label">{label}</span>
+      <input
+        max={max}
+        min={min}
+        onBlur={onCommit}
+        onChange={(event) => updateValue(event.target.value)}
+        step={step}
+        type="range"
+        value={value}
+      />
+      <span className="caption-range-value">
+        <input
+          className="caption-style-number"
+          max={max}
+          min={min}
+          onBlur={onCommit}
+          onChange={(event) => updateValue(event.target.value)}
+          step={step}
+          type="number"
+          value={value}
+        />
+        {suffix ? <span>{suffix}</span> : null}
+      </span>
+    </label>
+  );
+}
+
+type CaptionColorControlProps = {
+  label: string;
+  onChange: (value: string) => void;
+  onCommit: () => void;
+  value: string;
+};
+
+function CaptionColorControl({ label, onChange, onCommit, value }: CaptionColorControlProps) {
+  return (
+    <label className="caption-color-control">
+      <span className="caption-style-label">{label}</span>
+      <span className="caption-color-input">
+        <input
+          aria-label={label}
+          onBlur={onCommit}
+          onChange={(event) => onChange(event.target.value)}
+          type="color"
+          value={value}
+        />
+        <input
+          aria-label={`${label} HEX`}
+          className="caption-style-color-text"
+          onBlur={onCommit}
+          onChange={(event) => onChange(event.target.value)}
+          value={value}
+        />
+      </span>
+    </label>
+  );
+}
+
 type ImagePreviewPanelProps = {
   canDownloadAllCutsZip: boolean;
   canvasPreset: CanvasPreset;
   cut: Cut | null;
   exportState: ExportState;
   fonts: StudioFonts;
+  onCaptionStyleChange: (patch: Partial<CaptionStyle>) => void;
+  onCaptionStyleCommit: () => void;
   onDownloadAllCutsZip: () => void;
   onDownloadCurrentCut: () => void;
   project: Project | null;
@@ -2112,6 +2319,8 @@ function ImagePreviewPanel({
   cut,
   exportState,
   fonts,
+  onCaptionStyleChange,
+  onCaptionStyleCommit,
   onDownloadAllCutsZip,
   onDownloadCurrentCut,
   project,
@@ -2130,6 +2339,9 @@ function ImagePreviewPanel({
           cut={cut}
           exportId={`preview-${cut.id}`}
           fonts={fonts}
+          mode="preview"
+          onCaptionStyleChange={onCaptionStyleChange}
+          onCaptionStyleCommit={onCaptionStyleCommit}
           project={project}
         />
       ) : (
@@ -2175,29 +2387,74 @@ function CutExportCanvas({
   cut,
   exportId,
   fonts,
+  mode = "export",
+  onCaptionStyleChange,
+  onCaptionStyleCommit,
   project,
 }: {
   captionStyle: CaptionStyle;
   cut: Cut;
   exportId: string;
   fonts: StudioFonts;
+  mode?: "preview" | "export";
+  onCaptionStyleChange?: (patch: Partial<CaptionStyle>) => void;
+  onCaptionStyleCommit?: () => void;
   project: Project;
 }) {
+  const [canvasTarget, setCanvasTarget] = useState<HTMLElement | null>(null);
+  const [captionTarget, setCaptionTarget] = useState<HTMLParagraphElement | null>(null);
   const templateClass = cut.template === "card-news" ? "card-news" : "comic";
   const cssImageUrl = toCssImageUrl(cut.imageDataUrl);
   const hasImage = cssImageUrl !== "none";
   const overlay = getCutTextOverlay(cut);
+  const captionEditable = mode === "preview" && overlay.hasCaption && Boolean(onCaptionStyleChange);
+
+  function updateCaptionBoxFromTarget(target: HTMLElement) {
+    const nextBox = getCaptionBoxFromElement(target, canvasTarget);
+
+    if (!nextBox) {
+      return;
+    }
+
+    onCaptionStyleChange?.(nextBox);
+  }
+
+  function commitCaptionBox(target: HTMLElement | SVGElement) {
+    if (!(target instanceof HTMLElement)) {
+      return;
+    }
+
+    updateCaptionBoxFromTarget(target);
+    target.style.height = "";
+    target.style.transform = "none";
+    target.style.width = "";
+    onCaptionStyleCommit?.();
+  }
 
   return (
     <article
-      className={`cut-canvas ${getCanvasRatioClass(project.canvasPreset)} ${templateClass}`}
+      className={`cut-canvas ${getCanvasRatioClass(project.canvasPreset)} ${templateClass}${
+        captionEditable ? " caption-editable" : ""
+      }`}
       data-export-cut-id={exportId}
+      ref={mode === "preview" ? setCanvasTarget : undefined}
       style={
         {
           "--cut-image": cssImageUrl,
           "--cut-caption-align": captionStyle.align,
+          "--cut-caption-background": captionStyle.backgroundColor,
+          "--cut-caption-border-color": captionStyle.borderColor,
+          "--cut-caption-border-width-px": captionStyle.borderWidth,
+          "--cut-caption-color": captionStyle.color,
           "--cut-caption-font": fonts.subtitle,
           "--cut-caption-font-size-px": captionStyle.fontSize,
+          "--cut-caption-font-weight": captionStyle.fontWeight,
+          "--cut-caption-height-pct": captionStyle.heightPct,
+          "--cut-caption-padding-x-pct": captionStyle.paddingXPct,
+          "--cut-caption-padding-y-pct": captionStyle.paddingYPct,
+          "--cut-caption-width-pct": captionStyle.widthPct,
+          "--cut-caption-x-pct": captionStyle.xPct,
+          "--cut-caption-y-pct": captionStyle.yPct,
           "--cut-dialogue-font": fonts.dialogue,
         } as CSSProperties
       }
@@ -2214,13 +2471,68 @@ function CutExportCanvas({
         aria-hidden={!overlay.hasCaption}
       >
         {overlay.hasCaption ? (
-          <p className={`comic-caption caption-align-${captionStyle.align}`}>
+          <p
+            className={`comic-caption caption-align-${captionStyle.align}`}
+            ref={captionEditable ? setCaptionTarget : undefined}
+          >
             {overlay.caption}
           </p>
         ) : null}
       </div>
+      {captionEditable ? (
+        <Moveable
+          className="caption-moveable"
+          container={canvasTarget}
+          draggable
+          keepRatio={false}
+          onDrag={(event: CaptionMoveableDragEvent) => {
+            if (event.target instanceof HTMLElement) {
+              event.target.style.transform = event.transform;
+            }
+          }}
+          onDragEnd={(event: CaptionMoveableEndEvent) => {
+            commitCaptionBox(event.target);
+          }}
+          onResize={(event: CaptionMoveableResizeEvent) => {
+            if (event.target instanceof HTMLElement) {
+              event.target.style.height = `${event.height}px`;
+              event.target.style.transform = event.drag.transform;
+              event.target.style.width = `${event.width}px`;
+            }
+          }}
+          onResizeEnd={(event: CaptionMoveableEndEvent) => {
+            commitCaptionBox(event.target);
+          }}
+          origin={false}
+          resizable
+          target={captionTarget}
+        />
+      ) : null}
     </article>
   );
+}
+
+function getCaptionBoxFromElement(
+  target: HTMLElement,
+  canvas: HTMLElement | null,
+): Pick<CaptionStyle, "heightPct" | "widthPct" | "xPct" | "yPct"> | null {
+  if (!canvas) {
+    return null;
+  }
+
+  const canvasRect = canvas.getBoundingClientRect();
+  const targetRect = target.getBoundingClientRect();
+
+  if (canvasRect.width <= 0 || canvasRect.height <= 0) {
+    return null;
+  }
+
+  return {
+    heightPct: ((targetRect.height / canvasRect.height) * 100),
+    widthPct: ((targetRect.width / canvasRect.width) * 100),
+    xPct: (((targetRect.left - canvasRect.left) / canvasRect.width) * 100),
+    yPct: (((targetRect.top - canvasRect.top) / canvasRect.height) * 100),
+  };
 }
 
 function getCanvasRatioClass(canvasPreset: CanvasPreset) {
