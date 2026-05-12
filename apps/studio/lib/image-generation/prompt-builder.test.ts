@@ -42,18 +42,18 @@ const assets: ImageGenerationAssets = {
   },
 };
 
-test("buildImageGenerationPrompt creates an art-layer prompt with overlay-only text context", () => {
+test("buildImageGenerationPrompt creates an art-layer prompt with editable caption and model-rendered dialogue", () => {
   const prompt = buildImageGenerationPrompt({ assets, cut, project });
 
   assert.match(prompt, /generated art layer/);
-  assert.match(prompt, /HTML\/CSS text overlays/);
+  assert.match(prompt, /editable caption overlay/);
   assert.match(prompt, /clo/);
   assert.match(prompt, /round silhouette/);
   assert.match(prompt, /sunny studio/);
   assert.match(prompt, /glowing laptop/);
   assert.match(prompt, /soft editorial webtoon composition/);
   assert.match(prompt, /Caption overlay context only, never draw this text: Unexpected message/);
-  assert.match(prompt, /Dialogue overlay context only, never draw this text: What is this/);
+  assert.match(prompt, /Dialogue to render inside the generated image speech bubble: What is this/);
   assert.match(prompt, /1:1 square canvas/);
   assert.match(prompt, /Quality guardrails/);
   assert.match(prompt, new RegExp(GENERATED_IMAGE_TEXT_BAN));
@@ -68,11 +68,12 @@ test("buildImageGenerationPrompt keeps reference image data URLs out of the prom
   assert.doesNotMatch(prompt, /AAAA/);
 });
 
-test("buildImageGenerationPrompt reserves frames, speech bubbles, and caption boxes for the app overlay", () => {
+test("buildImageGenerationPrompt reserves only the caption box for the app overlay", () => {
   const prompt = buildImageGenerationPrompt({ assets, cut, project });
 
-  assert.match(prompt, /Do not draw comic frames, panel borders, color gradient bars, speech bubbles, caption boxes, or text containers/i);
-  assert.match(prompt, /The app will add the black frame, dialogue bubble, and bottom caption box/i);
+  assert.match(prompt, /Draw the dialogue as a speech bubble only when dialogue is provided/i);
+  assert.match(prompt, /The app will add the editable bottom caption box/i);
+  assert.match(prompt, /Do not draw comic frames, panel borders, color gradient bars, subtitles, caption boxes, or UI text/i);
 });
 
 test("buildImageGenerationPrompt documents empty cut fields with safe fallback text", () => {
@@ -90,8 +91,9 @@ test("buildImageGenerationPrompt documents empty cut fields with safe fallback t
 
   assert.match(prompt, /Scenario: No scenario provided\./);
   assert.match(prompt, /Caption overlay context only, never draw this text: No caption provided\./);
-  assert.match(prompt, /Dialogue overlay context only, never draw this text: No dialogue provided\./);
-  assert.match(prompt, /Clean editorial webtoon composition, consistent character, no text\./);
+  assert.match(prompt, /Dialogue: No dialogue provided\. Do not draw a speech bubble\./);
+  assert.match(prompt, /Clean editorial webtoon composition, consistent character, no random text\./);
+  assert.doesNotMatch(prompt, /consistent character, no text\./);
 });
 
 test("buildImageGenerationPrompt preserves canvas-specific composition context", () => {

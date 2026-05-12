@@ -2054,8 +2054,7 @@ function CutExportCanvas({
           </div>
         ) : null}
       </div>
-      <div className="cut-overlay-layer" aria-hidden={!overlay.hasCaption && !overlay.hasDialogue}>
-        {overlay.hasDialogue ? <p className="speech-bubble">{overlay.dialogue}</p> : null}
+      <div className="cut-overlay-layer" aria-hidden={!overlay.hasCaption}>
         {overlay.hasCaption ? <p className="comic-caption">{overlay.caption}</p> : null}
       </div>
     </article>

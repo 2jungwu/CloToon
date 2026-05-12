@@ -5,17 +5,21 @@ import type {
 } from "@/lib/image-generation/types";
 
 export const GENERATED_IMAGE_TEXT_BAN =
-  "No readable text, captions, speech bubbles, Korean lettering, UI text, subtitles, or dialogue inside the generated image.";
+  "No readable text other than the provided dialogue; no captions, subtitles, labels, signs, UI text, watermarks, logos, or random Korean lettering inside the generated image.";
 
 export function buildImageGenerationPrompt({ assets, cut, project }: BuildImagePromptInput) {
   const character = getSelectedCharacter(assets);
   const canvasDescription = getCanvasDescription(project.canvasPreset);
   const expressionNames = character.expressions.map((expression) => expression.name).filter(Boolean);
+  const dialogueInstruction =
+    cut.dialogue.trim().length > 0
+      ? `Dialogue to render inside the generated image speech bubble: ${cut.dialogue}`
+      : "Dialogue: No dialogue provided. Do not draw a speech bubble.";
 
   return [
-    "Create only the generated art layer for a local Instagram comic/card-news cut.",
+    "Create the generated art layer for a local Instagram comic/card-news cut.",
     GENERATED_IMAGE_TEXT_BAN,
-    "The final cut will be composed later with editable HTML/CSS text overlays, so keep the art layer clean and text-free.",
+    "The final cut keeps only the bottom caption as an editable caption overlay, so never draw the caption text.",
     "",
     `Project: ${project.name}`,
     `Content type: ${project.contentType}`,
@@ -37,10 +41,10 @@ export function buildImageGenerationPrompt({ assets, cut, project }: BuildImageP
     "Cut context:",
     `Scenario: ${cut.scenario || "No scenario provided."}`,
     `Caption overlay context only, never draw this text: ${cut.caption || "No caption provided."}`,
-    `Dialogue overlay context only, never draw this text: ${cut.dialogue || "No dialogue provided."}`,
+    dialogueInstruction,
     "",
     "Visual direction:",
-    cut.imagePrompt || "Clean editorial webtoon composition, consistent character, no text.",
+    cut.imagePrompt || "Clean editorial webtoon composition, consistent character, no random text.",
     "",
     "Quality guardrails:",
     "Avoid text artifacts, distorted hands, extra limbs, low quality, blurry details.",
@@ -48,11 +52,13 @@ export function buildImageGenerationPrompt({ assets, cut, project }: BuildImageP
     "Composition requirements:",
     "- Keep the selected character visually consistent with the markdown and expression references.",
     "- Use the background prompt as the default environment unless the cut prompt clearly overrides it.",
-    "- Use caption and dialogue only to understand emotion, action, and layout needs.",
-    "- Leave comfortable empty areas for later caption/dialogue HTML/CSS overlays.",
-    "- The app will add the black frame, dialogue bubble, and bottom caption box.",
-    "- Do not draw comic frames, panel borders, color gradient bars, speech bubbles, caption boxes, or text containers.",
-    "- Do not draw title cards, subtitles, labels, signs, watermarks, logos, or UI.",
+    "- Use the caption only to understand emotion, action, and layout needs.",
+    "- Leave a clear lower area for the app's editable caption overlay.",
+    "- Draw the dialogue as a speech bubble only when dialogue is provided.",
+    "- If no dialogue is provided, do not draw a speech bubble.",
+    "- The app will add the editable bottom caption box.",
+    "- Do not draw comic frames, panel borders, color gradient bars, subtitles, caption boxes, or UI text.",
+    "- Do not draw title cards, labels, signs, watermarks, logos, or random text.",
   ].join("\n");
 }
 

@@ -12,12 +12,11 @@ export type CutTextOverlay = {
 
 export function getCutTextOverlay(input: CutTextOverlayInput): CutTextOverlay {
   const caption = input.caption.trim().length > 0 ? input.caption : "";
-  const dialogue = input.dialogue.trim().length > 0 ? input.dialogue : "";
 
   return {
     caption,
-    dialogue,
+    dialogue: "",
     hasCaption: caption.length > 0,
-    hasDialogue: dialogue.length > 0,
+    hasDialogue: false,
   };
 }

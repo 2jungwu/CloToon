@@ -600,7 +600,7 @@ function FontsPanel({
       <div className="asset-preview">
         <strong style={{ fontFamily: assets.fonts.subtitle }}>자막 폰트 미리보기</strong>
         <span style={{ fontFamily: assets.fonts.dialogue }}>
-          대사 폰트가 적용된 문장입니다. 컷 안의 텍스트는 이미지에 굽지 않고 HTML/CSS로 렌더링합니다.
+          자막은 HTML/CSS 오버레이로 편집하고, 대사는 이미지 생성 프롬프트에 반영합니다.
         </span>
       </div>
 
