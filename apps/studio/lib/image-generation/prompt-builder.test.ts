@@ -21,6 +21,11 @@ const cut: ImageGenerationCut = {
   template: "comic",
   scenario: "The character walks into a small room and notices a glowing laptop.",
   caption: "Unexpected message",
+  captionStyleOverride: {
+    align: "left",
+    fontSize: 72,
+    position: "top",
+  },
   dialogue: "What is this?",
   imagePrompt: "soft editorial webtoon composition, curious expression",
 };
@@ -53,6 +58,7 @@ test("buildImageGenerationPrompt creates an art-layer prompt with editable capti
   assert.match(prompt, /glowing laptop/);
   assert.match(prompt, /soft editorial webtoon composition/);
   assert.match(prompt, /Caption overlay context only, never draw this text: Unexpected message/);
+  assert.match(prompt, /Editable caption overlay placement: top area; alignment: left; font size: 72px/);
   assert.match(prompt, /Dialogue to render inside the generated image speech bubble: What is this/);
   assert.match(prompt, /1:1 square canvas/);
   assert.match(prompt, /Quality guardrails/);
@@ -68,11 +74,12 @@ test("buildImageGenerationPrompt keeps reference image data URLs out of the prom
   assert.doesNotMatch(prompt, /AAAA/);
 });
 
-test("buildImageGenerationPrompt reserves only the caption box for the app overlay", () => {
+test("buildImageGenerationPrompt reserves the requested caption area for the app overlay", () => {
   const prompt = buildImageGenerationPrompt({ assets, cut, project });
 
   assert.match(prompt, /Draw the dialogue as a speech bubble only when dialogue is provided/i);
-  assert.match(prompt, /The app will add the editable bottom caption box/i);
+  assert.match(prompt, /The app will add the editable caption box/i);
+  assert.match(prompt, /Leave a clean, low-detail area for the app's editable caption overlay near the top area/i);
   assert.match(prompt, /Do not draw comic frames, panel borders, color gradient bars, subtitles, caption boxes, or UI text/i);
 });
 

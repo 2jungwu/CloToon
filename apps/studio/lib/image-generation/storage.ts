@@ -22,14 +22,17 @@ export function loadGeminiApiKeyFromStorage(storage: Storage) {
 
 export function loadGeminiImageModelFromStorage(storage: Storage) {
   const value = readStorageJson(storage, settingsStorageKey);
-  return isRecord(value) ? normalizeGeminiImageModel(value.geminiModel) : normalizeGeminiImageModel(null);
+  return isRecord(value)
+    ? normalizeGeminiImageModel(readSettingsImageModel(value))
+    : normalizeGeminiImageModel(null);
 }
 
 export function loadSelectedGeminiImageModelFromStorage(
   storage: Storage,
 ): GeminiImageModel | null {
   const value = readStorageJson(storage, settingsStorageKey);
-  return isRecord(value) && isGeminiImageModel(value.geminiModel) ? value.geminiModel : null;
+  const imageModel = isRecord(value) ? readSettingsImageModel(value) : null;
+  return isGeminiImageModel(imageModel) ? imageModel : null;
 }
 
 export function loadImageGenerationAssetsFromStorage(storage: Storage): ImageGenerationAssets {
@@ -156,6 +159,10 @@ function normalizeExpressions(value: unknown) {
 
 function getRecord(value: unknown) {
   return isRecord(value) ? value : null;
+}
+
+function readSettingsImageModel(value: Record<string, unknown>) {
+  return value.geminiImageModel ?? value.geminiModel;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

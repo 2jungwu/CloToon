@@ -1,4 +1,5 @@
 import type { CutTemplate } from "@/lib/cuts/types";
+import type { CaptionStyleOverride } from "@/lib/cuts/caption-style";
 import type { CanvasPreset, ContentType } from "@/lib/projects/types";
 
 export type ImageGenerationExpression = {
@@ -37,6 +38,7 @@ export type ImageGenerationCut = {
   template: CutTemplate;
   scenario: string;
   caption: string;
+  captionStyleOverride?: CaptionStyleOverride | null;
   dialogue: string;
   imagePrompt: string;
 };

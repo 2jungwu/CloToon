@@ -985,7 +985,9 @@ textarea::placeholder {
   bottom: 4%;
   display: flex;
   font-family: var(--cut-caption-font, var(--app-font-sans));
-  font-size: var(--cut-caption-font-size, 1.35rem);
+  font-size: calc(
+    var(--cut-caption-font-size-px, 56) * var(--cut-caption-render-scale, 0.38) * 1px
+  );
   font-weight: 900;
   justify-content: center;
   left: 4%;
@@ -996,11 +998,44 @@ textarea::placeholder {
   padding: 4.5% 5%;
   position: absolute;
   right: 4%;
-  text-align: center;
+  text-align: var(--cut-caption-align, center);
   white-space: pre-line;
   word-break: keep-all;
   overflow-wrap: anywhere;
   z-index: 2;
+}
+
+.cut-overlay-layer.caption-position-top .comic-caption {
+  bottom: auto;
+  top: 4%;
+  transform: none;
+}
+
+.cut-overlay-layer.caption-position-middle .comic-caption {
+  bottom: auto;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.cut-overlay-layer.caption-position-bottom .comic-caption {
+  bottom: 4%;
+  top: auto;
+  transform: none;
+}
+
+.comic-caption.caption-align-left {
+  justify-content: flex-start;
+  text-align: left;
+}
+
+.comic-caption.caption-align-center {
+  justify-content: center;
+  text-align: center;
+}
+
+.comic-caption.caption-align-right {
+  justify-content: flex-end;
+  text-align: right;
 }
 
 .speech-bubble {
@@ -1050,16 +1085,6 @@ textarea::placeholder {
   position: absolute;
 }
 
-.canvas-4-5 {
-  --cut-caption-font-size: 1.42rem;
-  --cut-dialogue-font-size: 1.45rem;
-}
-
-.canvas-9-16 {
-  --cut-caption-font-size: 1.5rem;
-  --cut-dialogue-font-size: 1.5rem;
-}
-
 .canvas-9-16 .speech-bubble {
   max-width: 68%;
   top: 5%;
@@ -1078,22 +1103,12 @@ textarea::placeholder {
 }
 
 .export-stack .cut-canvas {
-  --cut-caption-font-size: 56px;
+  --cut-caption-render-scale: 1;
   --cut-dialogue-font-size: 54px;
   --cut-frame-width: 14px;
   --cut-overlay-border: 6px;
   box-shadow: none;
   width: 1080px;
-}
-
-.export-stack .canvas-4-5 {
-  --cut-caption-font-size: 60px;
-  --cut-dialogue-font-size: 58px;
-}
-
-.export-stack .canvas-9-16 {
-  --cut-caption-font-size: 64px;
-  --cut-dialogue-font-size: 60px;
 }
 
 .split-layout {
@@ -1886,6 +1901,106 @@ body:has(.app-side-link[href="/projects"]:focus-visible) .project-drawer,
 .full-scenario-panel textarea::placeholder {
   color: var(--app-text-tertiary);
   opacity: 1;
+}
+
+.caption-style-editor {
+  background: rgba(0, 113, 227, 0.08);
+  border-radius: 8px;
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+}
+
+.caption-style-row {
+  display: grid;
+  gap: 8px;
+}
+
+.caption-style-label {
+  color: var(--app-text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+.caption-segmented {
+  display: grid;
+  gap: 4px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.caption-segmented button,
+.caption-style-reset {
+  align-items: center;
+  background: rgba(255, 255, 255, 0.82);
+  border: 0;
+  border-radius: 999px;
+  color: var(--app-text-secondary);
+  cursor: pointer;
+  display: inline-flex;
+  font-size: 13px;
+  font-weight: 600;
+  height: 34px;
+  justify-content: center;
+  padding: 0 12px;
+  transition:
+    background-color 160ms ease,
+    color 160ms ease,
+    box-shadow 160ms ease;
+}
+
+.caption-segmented button[data-active="true"] {
+  background: #ffffff;
+  color: var(--app-blue);
+  box-shadow: inset 0 0 0 1px rgba(0, 113, 227, 0.2);
+}
+
+.caption-segmented button:hover,
+.caption-style-reset:hover {
+  background: #ffffff;
+  color: var(--app-blue);
+}
+
+.caption-segmented button:focus-visible,
+.caption-style-reset:focus-visible,
+.caption-style-number:focus-visible {
+  box-shadow: 0 0 0 3px var(--app-focus);
+  outline: 2px solid var(--app-blue);
+  outline-offset: 2px;
+}
+
+.caption-font-size-control {
+  align-items: center;
+  display: grid;
+  gap: 8px 10px;
+  grid-template-columns: minmax(0, 1fr) 72px;
+}
+
+.caption-font-size-control .caption-style-label {
+  grid-column: 1 / -1;
+}
+
+.caption-font-size-control input[type="range"] {
+  accent-color: var(--app-blue);
+  width: 100%;
+}
+
+.caption-style-number {
+  background: #ffffff;
+  border: 1px solid var(--app-border);
+  border-radius: 8px;
+  color: var(--app-text);
+  font-size: 14px;
+  font-weight: 600;
+  height: 36px;
+  padding: 0 8px;
+  text-align: center;
+  width: 72px;
+}
+
+.caption-style-reset {
+  justify-self: start;
+  width: auto;
 }
 
 .storyboard-info {

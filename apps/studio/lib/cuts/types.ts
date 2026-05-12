@@ -1,3 +1,5 @@
+import type { CaptionStyleOverride } from "@/lib/cuts/caption-style";
+
 export type CutTemplate = "comic" | "card-news";
 export type CutImageStatus = "empty" | "mock" | "uploaded" | "generated" | "failed";
 
@@ -11,6 +13,7 @@ export type Cut = {
   dialogue: string;
   imagePrompt: string;
   negativePrompt: string;
+  captionStyleOverride: CaptionStyleOverride | null;
   imageDataUrl: string;
   imageStatus: CutImageStatus;
   createdAt: string;
@@ -25,6 +28,7 @@ export type CreateCutInput = {
   dialogue?: string;
   imagePrompt?: string;
   negativePrompt?: string;
+  captionStyleOverride?: CaptionStyleOverride | null;
   imageDataUrl?: string;
   imageStatus?: CutImageStatus;
 };
@@ -38,6 +42,7 @@ export type UpdateCutInput = Partial<
     | "dialogue"
     | "imagePrompt"
     | "negativePrompt"
+    | "captionStyleOverride"
     | "imageDataUrl"
     | "imageStatus"
   >

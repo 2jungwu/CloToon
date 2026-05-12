@@ -1,6 +1,12 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { createCut, duplicateCut, listCuts } from "@/lib/cuts/repository";
+import { createCut, duplicateCut, listCuts, updateCut } from "@/lib/cuts/repository";
+import {
+  captionAlignments,
+  captionFontSizeMax,
+  captionFontSizeMin,
+  captionPositions,
+} from "@/lib/cuts/caption-style";
 import { getProject } from "@/lib/projects/repository";
 
 export const runtime = "nodejs";
@@ -18,6 +24,15 @@ const createCutSchema = z.object({
   dialogue: z.string().max(2000).optional(),
   imagePrompt: z.string().max(4000).optional(),
   negativePrompt: z.string().max(2000).optional(),
+  captionStyleOverride: z
+    .object({
+      position: z.enum(captionPositions).optional(),
+      align: z.enum(captionAlignments).optional(),
+      fontSize: z.number().int().min(captionFontSizeMin).max(captionFontSizeMax).optional(),
+    })
+    .strict()
+    .nullable()
+    .optional(),
   duplicateFromCutId: z.string().uuid().optional(),
 });
 
@@ -48,10 +63,20 @@ export async function POST(request: Request, { params }: CutsRouteProps) {
   }
 
   if (result.data.duplicateFromCutId) {
-    const cut = duplicateCut(projectId, result.data.duplicateFromCutId);
+    let cut = duplicateCut(projectId, result.data.duplicateFromCutId);
 
     if (!cut) {
       return NextResponse.json({ error: "Cut not found" }, { status: 404 });
+    }
+
+    if (result.data.captionStyleOverride !== undefined) {
+      const updatedCut = updateCut(projectId, cut.id, {
+        captionStyleOverride: result.data.captionStyleOverride,
+      });
+
+      if (updatedCut) {
+        cut = updatedCut;
+      }
     }
 
     return NextResponse.json({ cut }, { status: 201 });
@@ -65,6 +90,7 @@ export async function POST(request: Request, { params }: CutsRouteProps) {
     dialogue: result.data.dialogue,
     imagePrompt: result.data.imagePrompt,
     negativePrompt: result.data.negativePrompt,
+    captionStyleOverride: result.data.captionStyleOverride,
   });
 
   return NextResponse.json({ cut }, { status: 201 });

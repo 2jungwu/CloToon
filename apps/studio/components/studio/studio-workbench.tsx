@@ -14,6 +14,16 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toCssImageUrl } from "@/lib/cuts/image-data-url";
+import {
+  captionAlignments,
+  captionFontSizeMax,
+  captionFontSizeMin,
+  captionPositions,
+  resolveCaptionStyle,
+  type CaptionAlign,
+  type CaptionPosition,
+  type CaptionStyle,
+} from "@/lib/cuts/caption-style";
 import { getCutTextOverlay } from "@/lib/cuts/text-overlay";
 import type { Cut, CutTemplate, UpdateCutInput } from "@/lib/cuts/types";
 import {
@@ -113,6 +123,17 @@ const labels = {
   produceAll: "\ud55c \ubc88\uc5d0 \uc81c\uc791",
   caption: "\uc790\ub9c9",
   captionPlaceholder: "\ud654\uba74\uc5d0 \ud45c\uc2dc\ud560 \uc790\ub9c9\uc744 \uc785\ub825\ud558\uc138\uc694.",
+  captionStyle: "\uc790\ub9c9 \uc2a4\ud0c0\uc77c",
+  captionPosition: "\uc704\uce58",
+  captionPositionTop: "\uc0c1\ub2e8",
+  captionPositionMiddle: "\uac00\uc6b4\ub370",
+  captionPositionBottom: "\ud558\ub2e8",
+  captionAlign: "\uc815\ub82c",
+  captionAlignLeft: "\uc67c\ucabd",
+  captionAlignCenter: "\uc911\uc559",
+  captionAlignRight: "\uc624\ub978\ucabd",
+  captionFontSize: "\ud06c\uae30",
+  captionStyleReset: "\uae30\ubcf8\uac12",
   dialogue: "\ub300\uc0ac",
   dialoguePlaceholder: "\ub300\uc0ac \ub610\ub294 \ubcf8\ubb38\uc744 \uc785\ub825\ud558\uc138\uc694.",
   imagePrompt: "\uc774\ubbf8\uc9c0 \ud504\ub86c\ud504\ud2b8",
@@ -178,6 +199,18 @@ const canvasPresetLabels: Record<CanvasPreset, string> = {
   "1:1": "1:1",
   "4:5": "4:5",
   "9:16": "9:16",
+};
+
+const captionPositionLabels: Record<CaptionPosition, string> = {
+  top: labels.captionPositionTop,
+  middle: labels.captionPositionMiddle,
+  bottom: labels.captionPositionBottom,
+};
+
+const captionAlignLabels: Record<CaptionAlign, string> = {
+  left: labels.captionAlignLeft,
+  center: labels.captionAlignCenter,
+  right: labels.captionAlignRight,
 };
 
 const defaultProjectNameByContentType: Record<ContentType, string> = {
@@ -978,6 +1011,7 @@ export function StudioWorkbench({ initialProjectId }: StudioWorkbenchProps) {
             template: savedCut.template,
             scenario: savedCut.scenario,
             caption: savedCut.caption,
+            captionStyleOverride: savedCut.captionStyleOverride,
             dialogue: savedCut.dialogue,
             imagePrompt: savedCut.imagePrompt,
           },
@@ -1333,6 +1367,7 @@ export function StudioWorkbench({ initialProjectId }: StudioWorkbenchProps) {
         <div className="export-stack" ref={exportRootRef} aria-hidden>
           {sortedCuts.map((cut) => (
             <CutExportCanvas
+              captionStyle={resolveCaptionStyle(cut.captionStyleOverride)}
               cut={cut}
               exportId={cut.id}
               fonts={studioPreferences.fonts}
@@ -1885,6 +1920,8 @@ function CutEditor({
     );
   }
 
+  const captionStyle = resolveCaptionStyle(selectedCut.captionStyleOverride);
+
   return (
     <div className="editor-panel production-editor">
       <div className="panel-heading inline-heading">
@@ -1914,6 +1951,20 @@ function CutEditor({
           value={selectedCut.caption}
         />
       </label>
+
+      <CaptionStyleControls
+        onChange={(patch) =>
+          onUpdateSelectedCut({
+            captionStyleOverride: {
+              ...captionStyle,
+              ...patch,
+            },
+          })
+        }
+        onCommit={onFlushSelectedCut}
+        onReset={() => onUpdateSelectedCut({ captionStyleOverride: null })}
+        style={captionStyle}
+      />
 
       <label className="field-stack">
         {labels.dialogue}
@@ -1950,6 +2001,100 @@ function CutEditor({
   );
 }
 
+type CaptionStyleControlsProps = {
+  onChange: (patch: Partial<CaptionStyle>) => void;
+  onCommit: () => void;
+  onReset: () => void;
+  style: CaptionStyle;
+};
+
+function CaptionStyleControls({
+  onChange,
+  onCommit,
+  onReset,
+  style,
+}: CaptionStyleControlsProps) {
+  function updateFontSize(value: string) {
+    const nextFontSize = Number.parseInt(value, 10);
+
+    if (Number.isNaN(nextFontSize)) {
+      return;
+    }
+
+    onChange({
+      fontSize: Math.min(Math.max(nextFontSize, captionFontSizeMin), captionFontSizeMax),
+    });
+  }
+
+  return (
+    <section className="caption-style-editor" aria-label={labels.captionStyle}>
+      <div className="caption-style-row">
+        <span className="caption-style-label">{labels.captionPosition}</span>
+        <div className="caption-segmented" role="group" aria-label={labels.captionPosition}>
+          {captionPositions.map((position) => (
+            <button
+              data-active={style.position === position}
+              key={position}
+              onBlur={onCommit}
+              onClick={() => onChange({ position })}
+              type="button"
+            >
+              {captionPositionLabels[position]}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="caption-style-row">
+        <span className="caption-style-label">{labels.captionAlign}</span>
+        <div className="caption-segmented" role="group" aria-label={labels.captionAlign}>
+          {captionAlignments.map((align) => (
+            <button
+              data-active={style.align === align}
+              key={align}
+              onBlur={onCommit}
+              onClick={() => onChange({ align })}
+              type="button"
+            >
+              {captionAlignLabels[align]}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <label className="caption-font-size-control">
+        <span className="caption-style-label">{labels.captionFontSize}</span>
+        <input
+          max={captionFontSizeMax}
+          min={captionFontSizeMin}
+          onBlur={onCommit}
+          onChange={(event) => updateFontSize(event.target.value)}
+          type="range"
+          value={style.fontSize}
+        />
+        <input
+          className="caption-style-number"
+          max={captionFontSizeMax}
+          min={captionFontSizeMin}
+          onBlur={onCommit}
+          onChange={(event) => updateFontSize(event.target.value)}
+          type="number"
+          value={style.fontSize}
+        />
+      </label>
+
+      <button
+        className="caption-style-reset"
+        onBlur={onCommit}
+        onClick={onReset}
+        type="button"
+      >
+        {labels.captionStyleReset}
+      </button>
+    </section>
+  );
+}
+
 type ImagePreviewPanelProps = {
   canDownloadAllCutsZip: boolean;
   canvasPreset: CanvasPreset;
@@ -1980,7 +2125,13 @@ function ImagePreviewPanel({
       </div>
 
       {project && cut ? (
-        <CutExportCanvas cut={cut} exportId={`preview-${cut.id}`} fonts={fonts} project={project} />
+        <CutExportCanvas
+          captionStyle={resolveCaptionStyle(cut.captionStyleOverride)}
+          cut={cut}
+          exportId={`preview-${cut.id}`}
+          fonts={fonts}
+          project={project}
+        />
       ) : (
         <div
           aria-label={labels.imagePreviewPlaceholder}
@@ -2020,11 +2171,13 @@ function ImagePreviewPanel({
 }
 
 function CutExportCanvas({
+  captionStyle,
   cut,
   exportId,
   fonts,
   project,
 }: {
+  captionStyle: CaptionStyle;
   cut: Cut;
   exportId: string;
   fonts: StudioFonts;
@@ -2042,7 +2195,9 @@ function CutExportCanvas({
       style={
         {
           "--cut-image": cssImageUrl,
+          "--cut-caption-align": captionStyle.align,
           "--cut-caption-font": fonts.subtitle,
+          "--cut-caption-font-size-px": captionStyle.fontSize,
           "--cut-dialogue-font": fonts.dialogue,
         } as CSSProperties
       }
@@ -2054,8 +2209,15 @@ function CutExportCanvas({
           </div>
         ) : null}
       </div>
-      <div className="cut-overlay-layer" aria-hidden={!overlay.hasCaption}>
-        {overlay.hasCaption ? <p className="comic-caption">{overlay.caption}</p> : null}
+      <div
+        className={`cut-overlay-layer caption-position-${captionStyle.position}`}
+        aria-hidden={!overlay.hasCaption}
+      >
+        {overlay.hasCaption ? (
+          <p className={`comic-caption caption-align-${captionStyle.align}`}>
+            {overlay.caption}
+          </p>
+        ) : null}
       </div>
     </article>
   );

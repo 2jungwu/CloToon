@@ -1,6 +1,11 @@
 import { randomUUID } from "node:crypto";
 import { getDatabase } from "@/lib/db/database";
 import { getProject, touchProject } from "@/lib/projects/repository";
+import {
+  normalizeCaptionStyleOverrideOrNull,
+  parseCaptionStyleOverride,
+  serializeCaptionStyleOverride,
+} from "@/lib/cuts/caption-style";
 import type { CreateCutInput, Cut, UpdateCutInput } from "@/lib/cuts/types";
 
 type CutRow = {
@@ -13,6 +18,7 @@ type CutRow = {
   dialogue: string;
   image_prompt: string;
   negative_prompt: string;
+  caption_style_json: string;
   image_data_url: string;
   image_status: Cut["imageStatus"];
   created_at: string;
@@ -23,7 +29,8 @@ export function listCuts(projectId: string): Cut[] {
   const rows = getDatabase()
     .prepare(
       `SELECT id, project_id, position, template, scenario, caption, dialogue,
-              image_prompt, negative_prompt, image_data_url, image_status, created_at, updated_at
+              image_prompt, negative_prompt, caption_style_json, image_data_url, image_status,
+              created_at, updated_at
        FROM cuts
        WHERE project_id = ?
        ORDER BY position ASC, created_at ASC`,
@@ -37,7 +44,8 @@ export function getCut(projectId: string, cutId: string): Cut | null {
   const row = getDatabase()
     .prepare(
       `SELECT id, project_id, position, template, scenario, caption, dialogue,
-              image_prompt, negative_prompt, image_data_url, image_status, created_at, updated_at
+              image_prompt, negative_prompt, caption_style_json, image_data_url, image_status,
+              created_at, updated_at
        FROM cuts
        WHERE project_id = ? AND id = ?`,
     )
@@ -53,6 +61,7 @@ export function createCut(input: CreateCutInput): Cut {
 
   const now = new Date().toISOString();
   const position = nextPosition(input.projectId);
+  const captionStyleOverride = normalizeCaptionStyleOverrideOrNull(input.captionStyleOverride);
   const cut: Cut = {
     id: randomUUID(),
     projectId: input.projectId,
@@ -63,6 +72,7 @@ export function createCut(input: CreateCutInput): Cut {
     dialogue: input.dialogue ?? "",
     imagePrompt: input.imagePrompt ?? "",
     negativePrompt: input.negativePrompt ?? "",
+    captionStyleOverride,
     imageDataUrl: input.imageDataUrl ?? "",
     imageStatus: input.imageStatus ?? "empty",
     createdAt: now,
@@ -73,8 +83,9 @@ export function createCut(input: CreateCutInput): Cut {
     .prepare(
       `INSERT INTO cuts (
         id, project_id, position, template, scenario, caption, dialogue,
-        image_prompt, negative_prompt, image_data_url, image_status, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        image_prompt, negative_prompt, caption_style_json, image_data_url, image_status,
+        created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .run(
       cut.id,
@@ -86,6 +97,7 @@ export function createCut(input: CreateCutInput): Cut {
       cut.dialogue,
       cut.imagePrompt,
       cut.negativePrompt,
+      serializeCaptionStyleOverride(cut.captionStyleOverride),
       cut.imageDataUrl,
       cut.imageStatus,
       cut.createdAt,
@@ -104,9 +116,14 @@ export function updateCut(projectId: string, cutId: string, input: UpdateCutInpu
     return null;
   }
 
+  const captionStyleOverride =
+    input.captionStyleOverride === undefined
+      ? current.captionStyleOverride
+      : normalizeCaptionStyleOverrideOrNull(input.captionStyleOverride);
   const next: Cut = {
     ...current,
     ...input,
+    captionStyleOverride,
     updatedAt: new Date().toISOString(),
   };
 
@@ -119,6 +136,7 @@ export function updateCut(projectId: string, cutId: string, input: UpdateCutInpu
            dialogue = ?,
            image_prompt = ?,
            negative_prompt = ?,
+           caption_style_json = ?,
            image_data_url = ?,
            image_status = ?,
            updated_at = ?
@@ -131,6 +149,7 @@ export function updateCut(projectId: string, cutId: string, input: UpdateCutInpu
       next.dialogue,
       next.imagePrompt,
       next.negativePrompt,
+      serializeCaptionStyleOverride(next.captionStyleOverride),
       next.imageDataUrl,
       next.imageStatus,
       next.updatedAt,
@@ -158,6 +177,7 @@ export function duplicateCut(projectId: string, cutId: string): Cut | null {
     dialogue: source.dialogue,
     imagePrompt: source.imagePrompt,
     negativePrompt: source.negativePrompt,
+    captionStyleOverride: source.captionStyleOverride,
     imageDataUrl: source.imageDataUrl,
     imageStatus: source.imageStatus,
   });
@@ -230,6 +250,7 @@ function toCut(row: CutRow): Cut {
     dialogue: row.dialogue,
     imagePrompt: row.image_prompt,
     negativePrompt: row.negative_prompt,
+    captionStyleOverride: parseCaptionStyleOverride(row.caption_style_json),
     imageDataUrl: row.image_data_url,
     imageStatus: row.image_status,
     createdAt: row.created_at,

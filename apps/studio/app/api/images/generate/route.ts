@@ -2,6 +2,12 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import {
+  captionAlignments,
+  captionFontSizeMax,
+  captionFontSizeMin,
+  captionPositions,
+} from "@/lib/cuts/caption-style";
+import {
   isAllowedReferenceImageDataUrl,
   isSupportedGeneratedImageMimeType,
   maxCutImageDataUrlLength,
@@ -39,6 +45,16 @@ const characterSchema = z.object({
   expressions: z.array(expressionSchema).max(10),
 });
 
+const captionStyleOverrideSchema = z
+  .object({
+    position: z.enum(captionPositions).optional(),
+    align: z.enum(captionAlignments).optional(),
+    fontSize: z.number().int().min(captionFontSizeMin).max(captionFontSizeMax).optional(),
+  })
+  .strict()
+  .nullable()
+  .optional();
+
 const requestSchema = z.object({
   apiKey: z.string().trim().min(1).max(500),
   project: z.object({
@@ -53,6 +69,7 @@ const requestSchema = z.object({
     template: z.enum(["comic", "card-news"]),
     scenario: z.string().max(4000),
     caption: z.string().max(1000),
+    captionStyleOverride: captionStyleOverrideSchema,
     dialogue: z.string().max(2000),
     imagePrompt: z.string().max(4000),
   }),
