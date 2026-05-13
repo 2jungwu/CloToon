@@ -122,6 +122,7 @@ const labels = {
     "\uce74\ub4dc\ub274\uc2a4 \uc804\uccb4 \ud750\ub984\uc744 \uc801\uc5b4\uc8fc\uc138\uc694.",
   produceAll: "\ud55c \ubc88\uc5d0 \uc81c\uc791",
   caption: "\uc790\ub9c9",
+  captionSettings: "\uc790\ub9c9 \uc124\uc815",
   captionPlaceholder: "\ud654\uba74\uc5d0 \ud45c\uc2dc\ud560 \uc790\ub9c9\uc744 \uc785\ub825\ud558\uc138\uc694.",
   applyCaptionStyleDefaults: "\uae30\ubcf8 \uc2a4\ud0c0\uc77c \uc801\uc6a9",
   captionLayerEdit: "폰트 레이어 편집",
@@ -1950,6 +1951,8 @@ function CutEditor({
       </div>
 
       <CaptionLayerEditor
+        captionAriaLabel={labels.captionSettings}
+        captionHeadingLabel={labels.captionSettings}
         onBlur={onFlushSelectedCut}
         onChange={(next) =>
           onUpdateSelectedCut({

@@ -117,7 +117,7 @@ function AssetsClient({
   const [assets, setAssets] = useState(initialAssets);
   const [settings, setSettings] = useState(initialSettings);
   const [activeSection, setActiveSection] = useState<AssetSection>(initialSection);
-  const [expandedCharacterId, setExpandedCharacterId] = useState(initialAssets.selectedCharacterId);
+  const [expandedCharacterId, setExpandedCharacterId] = useState("");
   const [saveState, setSaveState] = useState<"idle" | "assets" | "settings">("idle");
 
   const selectedCharacter = useMemo(
@@ -454,6 +454,7 @@ function CharacterPanel({
                   <Label className="field-stack">
                     캐릭터 설명(md)
                     <Textarea
+                      className="character-description-textarea"
                       value={character.markdown}
                       rows={10}
                       onChange={(event) => onUpdateCharacter(character.id, { markdown: event.target.value })}

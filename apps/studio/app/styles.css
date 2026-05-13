@@ -1225,7 +1225,7 @@ textarea::placeholder {
 
 .asset-layout .split-menu-item {
   color: var(--app-text-secondary);
-  font-size: 16px;
+  font-size: 20px;
   font-weight: 500;
   min-height: 54px;
 }
@@ -1387,7 +1387,15 @@ body:has(.app-side-link[href="/projects"]:focus-visible) .project-drawer,
 }
 
 .project-drawer-row[data-active="true"] .project-menu-item {
-  color: var(--app-blue);
+  color: var(--app-text);
+}
+
+.project-menu-item[data-active="true"],
+.project-menu-item[data-active="true"] > span:first-child,
+.project-menu-item[data-active="true"] small,
+.project-drawer-row[data-active="true"] .project-menu-item > span:first-child,
+.project-drawer-row[data-active="true"] .project-menu-item small {
+  color: var(--app-text);
 }
 
 .project-menu-item > span:first-child {
@@ -2476,12 +2484,13 @@ body:has(.app-side-link[href="/projects"]:focus-visible) .project-drawer,
   grid-template-columns: minmax(0, 1fr) minmax(280px, 360px);
 }
 
-.workspace-cut-item {
+.workspace-layout .workspace-cut-item {
+  font-size: 20px;
   min-height: 54px;
 }
 
 .workspace-cut-item strong {
-  font-size: 16px;
+  font-size: 20px;
   font-weight: 500;
 }
 
@@ -2680,6 +2689,13 @@ body:has(.app-side-link[href="/projects"]:focus-visible) .project-drawer,
   gap: 16px;
   margin-bottom: 14px;
   padding: 20px;
+}
+
+.character-description-textarea {
+  height: 300px;
+  max-height: 300px;
+  min-height: 300px;
+  resize: none;
 }
 
 .asset-detail .toolbar-row [data-slot="button"] {

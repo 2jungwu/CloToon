@@ -42,6 +42,8 @@ export type CaptionLayerEditorValue = {
 };
 
 type CaptionLayerEditorProps = {
+  captionAriaLabel?: string;
+  captionHeadingLabel?: string;
   onBlur?: () => void;
   onChange: (value: CaptionLayerEditorValue) => void;
   showCaptionTextarea?: boolean;
@@ -129,6 +131,8 @@ export function getCaptionLayerStyle(captionStyleInput: CaptionStyle): CaptionLa
 }
 
 export function CaptionLayerEditor({
+  captionAriaLabel,
+  captionHeadingLabel = labels.caption,
   onBlur,
   onChange,
   showCaptionTextarea = true,
@@ -149,10 +153,10 @@ export function CaptionLayerEditor({
   }
 
   return (
-    <section className="caption-layer-editor" aria-label={labels.captionLayerEdit}>
+    <section className="caption-layer-editor" aria-label={captionAriaLabel ?? labels.captionLayerEdit}>
       <div className="caption-editor-section">
         <div className="caption-editor-head">
-          <strong>{labels.caption}</strong>
+          <strong>{captionHeadingLabel}</strong>
           <span>{labels.captionTextStyle}</span>
         </div>
         <div className="caption-editor-toolbar text-toolbar" aria-label={labels.captionTextStyle}>
