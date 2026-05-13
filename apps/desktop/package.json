@@ -13,6 +13,11 @@
     "appId": "local.clotoon.studio",
     "productName": "CloToon",
     "electronVersion": "42.0.1",
+    "compression": "maximum",
+    "electronLanguages": [
+      "ko",
+      "en-US"
+    ],
     "directories": {
       "output": "dist"
     },

@@ -110,30 +110,24 @@ function createMainWindow() {
 
 function startServer() {
   const runtime = readRuntimeManifest();
-  const nodeExecutable = path.join(getResourcesRoot(), runtime.nodeExecutable);
   const serverEntry = path.join(getResourcesRoot(), runtime.serverEntry);
-
-  if (!fs.existsSync(nodeExecutable)) {
-    throw new Error(`Windows Node runtime을 찾을 수 없습니다: ${nodeExecutable}`);
-  }
+  const serverExecutable = runtime.nodeExecutable
+    ? path.join(getResourcesRoot(), runtime.nodeExecutable)
+    : process.execPath;
 
   if (!fs.existsSync(serverEntry)) {
     throw new Error(`Next 서버 엔트리를 찾을 수 없습니다: ${serverEntry}`);
   }
 
-  serverProcess = spawn(nodeExecutable, [serverEntry], {
+  if (!fs.existsSync(serverExecutable)) {
+    throw new Error(`Node server executable을 찾을 수 없습니다: ${serverExecutable}`);
+  }
+
+  const serverEnv = buildServerEnvironment(runtime);
+
+  serverProcess = spawn(serverExecutable, [serverEntry], {
     cwd: path.dirname(serverEntry),
-    env: {
-      ...process.env,
-      HOSTNAME: host,
-      LOCAL_STUDIO_DATA_DIR: studioDataDir,
-      LOCAL_STUDIO_DESKTOP_AUTH_COOKIE: desktopAuthCookieName,
-      LOCAL_STUDIO_DESKTOP_AUTH_TOKEN: desktopAuthToken,
-      LOCAL_STUDIO_DESKTOP_ORIGIN: appUrl,
-      NEXT_TELEMETRY_DISABLED: "1",
-      NODE_ENV: "production",
-      PORT: String(port),
-    },
+    env: serverEnv,
     stdio: "ignore",
     windowsHide: true,
   });
@@ -159,6 +153,46 @@ function startServer() {
   });
 
   serverProcess.unref();
+}
+
+function buildServerEnvironment(runtime) {
+  const serverEnv = {
+    HOSTNAME: host,
+    LOCAL_STUDIO_DATA_DIR: studioDataDir,
+    LOCAL_STUDIO_DESKTOP_AUTH_COOKIE: desktopAuthCookieName,
+    LOCAL_STUDIO_DESKTOP_AUTH_TOKEN: desktopAuthToken,
+    LOCAL_STUDIO_DESKTOP_ORIGIN: appUrl,
+    NEXT_TELEMETRY_DISABLED: "1",
+    NODE_ENV: "production",
+    PORT: String(port),
+  };
+
+  copyExistingEnvironmentValues(serverEnv, [
+    "APPDATA",
+    "COMSPEC",
+    "LOCALAPPDATA",
+    "PATH",
+    "Path",
+    "SystemRoot",
+    "TEMP",
+    "TMP",
+    "USERPROFILE",
+    "WINDIR",
+  ]);
+
+  if (!runtime.nodeExecutable) {
+    serverEnv.ELECTRON_RUN_AS_NODE = "1";
+  }
+
+  return serverEnv;
+}
+
+function copyExistingEnvironmentValues(target, names) {
+  for (const name of names) {
+    if (process.env[name]) {
+      target[name] = process.env[name];
+    }
+  }
 }
 
 function setDesktopAuthCookie() {
@@ -240,9 +274,12 @@ function readRuntimeManifest() {
   if (
     !manifest ||
     typeof manifest !== "object" ||
-    typeof manifest.nodeExecutable !== "string" ||
     typeof manifest.serverEntry !== "string"
   ) {
+    throw new Error("데스크톱 런타임 manifest 형식이 올바르지 않습니다.");
+  }
+
+  if ("nodeExecutable" in manifest && typeof manifest.nodeExecutable !== "string") {
     throw new Error("데스크톱 런타임 manifest 형식이 올바르지 않습니다.");
   }
 

@@ -11,9 +11,6 @@ const requiredServerFilesSource = path.join(studioDir, ".next", "required-server
 const resourcesDir = path.join(desktopDir, "resources");
 const studioResourceDir = path.join(resourcesDir, "studio");
 const standaloneTarget = path.join(studioResourceDir, "standalone");
-const nodeTargetDir = path.join(resourcesDir, "node", "win-x64");
-const nodeTarget = path.join(nodeTargetDir, "node.exe");
-const expectedNodeRuntimeVersion = "v24.8.0";
 
 main();
 
@@ -34,10 +31,8 @@ function main() {
 
   copyDirectory(staticSource, path.join(serverDir, ".next", "static"));
   copyDirectory(publicSource, path.join(serverDir, "public"));
-  copyNodeRuntime();
 
   writeRuntimeManifest({
-    nodeExecutable: toPortablePath(path.relative(resourcesDir, nodeTarget)),
     serverEntry: toPortablePath(path.relative(resourcesDir, serverEntry)),
   });
 
@@ -131,21 +126,6 @@ function isStandaloneServerEntry(filePath) {
   }
 
   return fs.existsSync(path.join(path.dirname(filePath), ".next", "required-server-files.json"));
-}
-
-function copyNodeRuntime() {
-  if (process.version !== expectedNodeRuntimeVersion) {
-    throw new Error(
-      `desktop:prepare는 Node ${expectedNodeRuntimeVersion} 런타임이 필요합니다. 현재 런타임: ${process.version}`,
-    );
-  }
-
-  if (!process.execPath.toLowerCase().endsWith("node.exe")) {
-    throw new Error(`현재 프로세스가 Windows node.exe가 아닙니다: ${process.execPath}`);
-  }
-
-  fs.mkdirSync(nodeTargetDir, { recursive: true });
-  fs.copyFileSync(process.execPath, nodeTarget);
 }
 
 function writeRuntimeManifest(manifest) {
