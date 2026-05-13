@@ -2704,6 +2704,19 @@ body:has(.app-side-link[href="/projects"]:focus-visible) .project-drawer,
   padding: 18px;
 }
 
+.caption-style-default-preview {
+  aspect-ratio: 1 / 1;
+  background: #f5f5f7;
+  min-height: 240px;
+  overflow: hidden;
+  padding: 0;
+  position: relative;
+}
+
+.caption-style-default-preview .image-preview-caption {
+  bottom: 8%;
+}
+
 .asset-preview strong {
   color: var(--app-text);
   font-size: 30px;

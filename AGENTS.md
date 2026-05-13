@@ -3,7 +3,7 @@
 ## Project Overview
 
 - 이 저장소는 로컬 PC에서 실행하는 인스타툰/카드뉴스 제작 스튜디오입니다.
-- 사용자는 프로젝트를 만들고, 컷별 시나리오, 자막, 대사, 이미지 프롬프트를 편집하고, HTML/CSS 컷 미리보기를 PNG/ZIP으로 내보냅니다.
+- 사용자는 프로젝트를 만들고, 컷별 시나리오, 자막, 자막 레이어 스타일, 대사, 이미지 프롬프트를 편집하고, HTML/CSS 컷 미리보기를 PNG/ZIP으로 내보냅니다.
 - 제품 요구사항은 `PRD.md`, 개발 계획은 `ROADMAP.md`, 디자인 기준은 `DESIGN.md`를 참고합니다.
 - 현재 구조는 npm workspaces 기반 모노레포이며 실제 앱은 `apps/studio`에 있습니다.
 
@@ -38,12 +38,14 @@
 - `apps/studio/app/api/projects/`: 프로젝트, 컷, 순서 변경, 수정, 삭제를 위한 로컬 JSON API
 - `apps/studio/app/api/images/generate/`: Gemini 이미지 생성을 위한 로컬 API route
 - `apps/studio/components/`: 공유 React 컴포넌트
+- `apps/studio/components/studio/`: 현재 Studio Workbench와 컷 편집/미리보기 UI
 - `apps/studio/components/ui/`: shadcn/Radix UI 래퍼 컴포넌트
 - `apps/studio/components/projects/`: 프로젝트 목록, 생성, 삭제 UI
-- `apps/studio/components/workspace/`: 컷 편집기, HTML 미리보기, mock 이미지, 업로드, PNG/ZIP export
+- `apps/studio/components/workspace/`: 기존 Workspace 편집 컴포넌트
 - `apps/studio/lib/db/`: SQLite 연결과 마이그레이션
 - `apps/studio/lib/projects/`: 프로젝트 타입과 repository 함수
 - `apps/studio/lib/cuts/`: 컷 타입과 repository 함수
+- `apps/studio/lib/caption-style/`: 자막 레이어 스타일 타입, 검증, 색상 유틸
 - `apps/studio/lib/image-generation/`: Gemini prompt 조합, localStorage 로드, 이미지 생성 타입
 - `apps/studio/test/`: Node test runner에서 `@/*` 별칭을 해석하는 테스트 보조 로더
 - `docs/`: PRD 생성/검증 보조 문서와 이미지 생성 규칙 문서
@@ -76,6 +78,8 @@
 - API에서 대상이 없으면 일관되게 `404` 응답을 반환합니다.
 - 로컬 데이터 변경 시 `data/app.db`에 사용자의 실제 작업물이 있을 수 있다고 가정합니다.
 - `/settings`는 `/assets?section=api-key` 리다이렉트 호환을 유지합니다.
+- 자막 레이어 편집은 `captionStyle` 타입과 `caption_style_json` 저장 호환을 유지합니다.
+- Assets의 `captionStyleDefaults`는 새 컷 생성에만 자동 적용하고, 기존 컷은 명시적인 적용 액션 없이 자동 변경하지 않습니다.
 - API Key는 브라우저 localStorage에만 저장하고, 코드/DB/문서/로그/git에 남기지 않습니다.
 
 ## Verification
@@ -108,18 +112,21 @@
 - `canvasPreset`: `"1:1"`, `"4:5"`, `"9:16"`
 - `cut`: 프로젝트 안의 한 장면/페이지. `position`으로 정렬됩니다.
 - `caption`: HTML 미리보기에 표시되는 자막 또는 제목
-- `dialogue`: HTML 미리보기에 표시되는 대사 또는 본문
+- `captionStyle`: 자막 글자 스타일과 박스 스타일. SQLite에서는 `caption_style_json`으로 저장됩니다.
+- `captionStyleDefaults`: `local-studio-assets`에 저장되는 새 컷용 기본 자막 스타일
+- `dialogue`: 사용자가 입력한 대사 또는 본문. HTML 대사 오버레이로 중복 렌더링하지 않고, 이미지 생성 시 말풍선/대사 표현으로 반영할 수 있습니다.
 - `imagePrompt`: mock 또는 AI 이미지 생성에 쓰는 프롬프트
 - `negativePrompt`: 이미지 생성 제외 조건
 - `imageDataUrl`: mock, 업로드, 생성 컷 이미지의 data URL
 - `imageStatus`: `"empty"`, `"mock"`, `"uploaded"`, `"generated"`, `"failed"`
 - `character`: 캐릭터 이름, 캐릭터 설명 Markdown, 캐릭터 표정 이미지를 포함하는 로컬 세트
-- `assets`: 캐릭터, 배경, 폰트 설정을 포함하는 브라우저 localStorage 데이터
+- `assets`: 캐릭터, 배경, 폰트, 기본 자막 스타일 설정을 포함하는 브라우저 localStorage 데이터
 - `settings`: API Key와 export 옵션을 포함하는 브라우저 localStorage 데이터
 
 ## AI / LLM Engineering Rules
 
 - `caption` 자막은 HTML/CSS 레이어로 렌더링합니다.
+- Assets의 `자막 스타일` 기본값은 새 컷 생성에만 자동 적용하고, 기존 컷은 Workspace의 `기본 스타일 적용` 같은 명시 액션으로만 변경합니다.
 - `dialogue` 대사는 사용자가 입력한 문구에 한해 이미지 모델이 말풍선/대사로 반영할 수 있습니다.
 - 이미지 프롬프트와 자막/대사의 역할을 분리합니다.
 - 생성 이미지 안의 임의 한국어 텍스트, UI 텍스트, 워터마크, 로고에 의존하지 않습니다.

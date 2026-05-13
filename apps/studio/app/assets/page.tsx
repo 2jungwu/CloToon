@@ -8,6 +8,11 @@ import {
 } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 
+import {
+  CaptionLayerEditor,
+  getCaptionLayerStyle,
+  type CaptionLayerCSSProperties,
+} from "@/components/studio/caption-layer-editor";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -19,6 +24,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { normalizeCaptionStyle } from "@/lib/caption-style/schema";
+import { defaultCaptionStyle, type CaptionStyle } from "@/lib/caption-style/types";
 import { isAllowedReferenceImageDataUrl } from "@/lib/cuts/image-data-url";
 import { assetsStorageKey, settingsStorageKey } from "@/lib/image-generation/storage";
 import {
@@ -28,7 +35,7 @@ import {
   type GeminiImageModel,
 } from "@/lib/image-generation/models";
 
-type AssetSection = "characters" | "background" | "fonts" | "api-key" | "export";
+type AssetSection = "characters" | "background" | "fonts" | "caption-style" | "api-key" | "export";
 
 type ExpressionImage = {
   id: string;
@@ -56,6 +63,7 @@ type StudioAssets = {
     subtitle: string;
     dialogue: string;
   };
+  captionStyleDefaults: CaptionStyle;
 };
 
 type StudioSettings = {
@@ -70,6 +78,7 @@ const menuItems: { id: AssetSection; label: string }[] = [
   { id: "characters", label: "캐릭터" },
   { id: "background", label: "배경" },
   { id: "fonts", label: "폰트" },
+  { id: "caption-style", label: "자막 스타일" },
   { id: "api-key", label: "API" },
   { id: "export", label: "내보내기" },
 ];
@@ -260,7 +269,7 @@ function AssetsClient({
       <div className="page-heading">
         <p className="eyebrow">Assets</p>
         <h1>에셋 설정</h1>
-        <p>캐릭터, 배경, 폰트, API, 내보내기 옵션을 로컬에 저장합니다.</p>
+        <p>캐릭터, 배경, 폰트, 자막 스타일, API, 내보내기 옵션을 로컬에 저장합니다.</p>
       </div>
 
       <div className="split-layout asset-layout">
@@ -313,6 +322,17 @@ function AssetsClient({
               assets={assets}
               onSave={saveAssets}
               onUpdate={(fonts) => updateAssets((current) => ({ ...current, fonts }))}
+              saveState={saveState}
+            />
+          ) : null}
+
+          {activeSection === "caption-style" ? (
+            <CaptionStylePanel
+              assets={assets}
+              onSave={saveAssets}
+              onUpdate={(captionStyleDefaults) =>
+                updateAssets((current) => ({ ...current, captionStyleDefaults }))
+              }
               saveState={saveState}
             />
           ) : null}
@@ -609,6 +629,49 @@ function FontsPanel({
   );
 }
 
+function CaptionStylePanel({
+  assets,
+  onSave,
+  onUpdate,
+  saveState,
+}: {
+  assets: StudioAssets;
+  onSave: () => void;
+  onUpdate: (captionStyleDefaults: CaptionStyle) => void;
+  saveState: "idle" | "assets" | "settings";
+}) {
+  const previewCaption = "자막 스타일 미리보기";
+
+  return (
+    <>
+      <div className="panel-heading">
+        <div>
+          <h2>자막 스타일</h2>
+          <p>앞으로 만드는 컷에 자동 적용할 기본 자막 글자와 박스 스타일을 저장합니다.</p>
+        </div>
+      </div>
+
+      <CaptionLayerEditor
+        onChange={(next) => onUpdate(next.captionStyle)}
+        showCaptionTextarea={false}
+        value={{
+          caption: previewCaption,
+          captionStyle: assets.captionStyleDefaults,
+        }}
+      />
+
+      <div
+        className="asset-preview caption-style-default-preview"
+        style={getCaptionLayerStyle(assets.captionStyleDefaults) as CaptionLayerCSSProperties}
+      >
+        <p className="image-preview-caption">{previewCaption}</p>
+      </div>
+
+      <SaveRow onSave={onSave} saved={saveState === "assets"} />
+    </>
+  );
+}
+
 function ApiKeyPanel({
   onSave,
   onUpdate,
@@ -781,6 +844,7 @@ function buildPreview(assets: StudioAssets, settings: StudioSettings) {
         exportScale: settings.exportScale,
         saveOriginalHtml: settings.saveOriginalHtml,
         captionOverlay: true,
+        captionStyleDefaults: assets.captionStyleDefaults,
         dialogueInGeneratedImage: true,
         finalDownload: "HTML rendered PNG",
         bundle: "ZIP per cut",
@@ -865,6 +929,7 @@ function migrateAssets(value: unknown): StudioAssets {
         subtitle: getString(getRecord(value.fonts)?.subtitle, "Pretendard"),
         dialogue: getString(getRecord(value.fonts)?.dialogue, "Pretendard"),
       },
+      captionStyleDefaults: normalizeCaptionStyle(value.captionStyleDefaults),
     });
   }
 
@@ -890,6 +955,7 @@ function migrateAssets(value: unknown): StudioAssets {
       subtitle: getString(value.subtitleFont, "Pretendard"),
       dialogue: getString(value.dialogueFont, "Pretendard"),
     },
+    captionStyleDefaults: defaultCaptionStyle,
   });
 }
 
@@ -925,6 +991,7 @@ function ensureAssets(assets: StudioAssets): StudioAssets {
     ...assets,
     characters,
     selectedCharacterId,
+    captionStyleDefaults: normalizeCaptionStyle(assets.captionStyleDefaults),
   };
 }
 
@@ -944,6 +1011,7 @@ function createDefaultAssets(): StudioAssets {
       subtitle: "Pretendard",
       dialogue: "Pretendard",
     },
+    captionStyleDefaults: defaultCaptionStyle,
   };
 }
 
@@ -1006,7 +1074,14 @@ function normalizeExpressions(value: unknown): ExpressionImage[] {
 }
 
 function isAssetSection(value: string | null): value is AssetSection {
-  return value === "characters" || value === "background" || value === "fonts" || value === "api-key" || value === "export";
+  return (
+    value === "characters" ||
+    value === "background" ||
+    value === "fonts" ||
+    value === "caption-style" ||
+    value === "api-key" ||
+    value === "export"
+  );
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

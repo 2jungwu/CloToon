@@ -2,7 +2,39 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { getColorAreaHsv, hsvToRgb, rgbToHex } from "./color.ts";
 import { normalizeCaptionStyle, parseCaptionStyle, serializeCaptionStyle } from "./schema.ts";
+import {
+  loadCaptionStyleDefaultsFromStorage,
+  readCaptionStyleDefaultsFromAssets,
+} from "./storage.ts";
 import { defaultCaptionStyle } from "./types.ts";
+
+class MemoryStorage implements Storage {
+  private store = new Map<string, string>();
+
+  get length() {
+    return this.store.size;
+  }
+
+  clear() {
+    this.store.clear();
+  }
+
+  getItem(key: string) {
+    return this.store.get(key) ?? null;
+  }
+
+  key(index: number) {
+    return Array.from(this.store.keys())[index] ?? null;
+  }
+
+  removeItem(key: string) {
+    this.store.delete(key);
+  }
+
+  setItem(key: string, value: string) {
+    this.store.set(key, value);
+  }
+}
 
 test("parseCaptionStyle falls back to the default style for empty or malformed values", () => {
   assert.deepEqual(parseCaptionStyle(""), defaultCaptionStyle);
@@ -78,6 +110,44 @@ test("serializeCaptionStyle returns a normalized JSON payload", () => {
 
   assert.equal(parsed.text.color, "#00aaff");
   assert.equal(parsed.text.fontSize, defaultCaptionStyle.text.fontSize);
+});
+
+test("readCaptionStyleDefaultsFromAssets falls back to default style", () => {
+  assert.deepEqual(readCaptionStyleDefaultsFromAssets({}), defaultCaptionStyle);
+});
+
+test("readCaptionStyleDefaultsFromAssets normalizes saved caption style defaults", () => {
+  const style = readCaptionStyleDefaultsFromAssets({
+    captionStyleDefaults: {
+      text: { color: "#ABCDEF", fontSize: 40 },
+      box: { backgroundColor: "#101010", borderWidth: 4, paddingX: 44 },
+    },
+  });
+
+  assert.equal(style.text.color, "#abcdef");
+  assert.equal(style.text.fontSize, 40);
+  assert.equal(style.box.backgroundColor, "#101010");
+  assert.equal(style.box.borderWidth, 4);
+  assert.equal(style.box.paddingX, 44);
+  assert.equal(style.box.paddingY, defaultCaptionStyle.box.paddingY);
+});
+
+test("loadCaptionStyleDefaultsFromStorage reads local-studio-assets caption defaults", () => {
+  const storage = new MemoryStorage();
+  storage.setItem(
+    "local-studio-assets",
+    JSON.stringify({
+      captionStyleDefaults: {
+        text: { color: "#123456" },
+        box: { borderRadius: 12 },
+      },
+    }),
+  );
+
+  const style = loadCaptionStyleDefaultsFromStorage(storage);
+
+  assert.equal(style.text.color, "#123456");
+  assert.equal(style.box.borderRadius, 12);
 });
 
 test("getColorAreaHsv maps color area coordinates to saturation and brightness", () => {
