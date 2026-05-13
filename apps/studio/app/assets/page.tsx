@@ -61,7 +61,7 @@ type StudioAssets = {
 type StudioSettings = {
   provider: "gemini";
   geminiApiKey: string;
-  geminiModel: GeminiImageModel;
+  geminiImageModel: GeminiImageModel;
   exportScale: "1080" | "2160";
   saveOriginalHtml: boolean;
 };
@@ -139,7 +139,7 @@ function AssetsClient({
   }
 
   function saveSettings() {
-    window.localStorage.setItem(settingsStorageKey, JSON.stringify({ ...settings, provider: "gemini" }));
+    window.localStorage.setItem(settingsStorageKey, JSON.stringify(serializeSettings(settings)));
     setSaveState("settings");
   }
 
@@ -600,7 +600,7 @@ function FontsPanel({
       <div className="asset-preview">
         <strong style={{ fontFamily: assets.fonts.subtitle }}>자막 폰트 미리보기</strong>
         <span style={{ fontFamily: assets.fonts.dialogue }}>
-          대사 폰트가 적용된 문장입니다. 컷 안의 텍스트는 이미지에 굽지 않고 HTML/CSS로 렌더링합니다.
+          자막은 HTML/CSS 오버레이로 편집하고, 대사는 이미지 생성 프롬프트에 반영합니다.
         </span>
       </div>
 
@@ -649,11 +649,11 @@ function ApiKeyPanel({
         <div className="model-option-list" aria-label="Gemini 이미지 모델" role="radiogroup">
           {geminiImageModels.map((model) => (
             <button
-              aria-checked={settings.geminiModel === model.id}
+              aria-checked={settings.geminiImageModel === model.id}
               className="model-option-item"
-              data-active={settings.geminiModel === model.id}
+              data-active={settings.geminiImageModel === model.id}
               key={model.id}
-              onClick={() => onUpdate({ geminiModel: model.id })}
+              onClick={() => onUpdate({ geminiImageModel: model.id })}
               role="radio"
               type="button"
             >
@@ -765,7 +765,7 @@ function buildPreview(assets: StudioAssets, settings: StudioSettings) {
   return JSON.stringify(
     {
       provider: "gemini",
-      model: settings.geminiModel,
+      model: settings.geminiImageModel,
       apiKeyRegistered: settings.geminiApiKey.trim().length > 0,
       promptParts: [
         "cut.imagePrompt",
@@ -780,7 +780,8 @@ function buildPreview(assets: StudioAssets, settings: StudioSettings) {
       output: {
         exportScale: settings.exportScale,
         saveOriginalHtml: settings.saveOriginalHtml,
-        textInImage: false,
+        captionOverlay: true,
+        dialogueInGeneratedImage: true,
         finalDownload: "HTML rendered PNG",
         bundle: "ZIP per cut",
       },
@@ -900,9 +901,17 @@ function migrateSettings(value: unknown): StudioSettings {
   return {
     provider: "gemini",
     geminiApiKey: getString(value.geminiApiKey, ""),
-    geminiModel: normalizeGeminiImageModel(value.geminiModel),
+    geminiImageModel: normalizeGeminiImageModel(value.geminiImageModel ?? value.geminiModel),
     exportScale: value.exportScale === "2160" ? "2160" : "1080",
     saveOriginalHtml: typeof value.saveOriginalHtml === "boolean" ? value.saveOriginalHtml : true,
+  };
+}
+
+function serializeSettings(settings: StudioSettings) {
+  return {
+    ...settings,
+    provider: "gemini",
+    geminiModel: settings.geminiImageModel,
   };
 }
 
@@ -942,7 +951,7 @@ function createDefaultSettings(): StudioSettings {
   return {
     provider: "gemini",
     geminiApiKey: "",
-    geminiModel: defaultGeminiImageModel,
+    geminiImageModel: defaultGeminiImageModel,
     exportScale: "1080",
     saveOriginalHtml: true,
   };

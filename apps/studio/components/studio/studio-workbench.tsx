@@ -40,8 +40,8 @@ import type { CaptionStyle, CaptionWidthMode } from "@/lib/caption-style/types";
 import type { Cut, CutTemplate, UpdateCutInput } from "@/lib/cuts/types";
 import {
   loadGeminiApiKeyFromStorage,
-  loadGeminiImageModelFromStorage,
   loadImageGenerationAssetsFromStorage,
+  loadSelectedGeminiImageModelFromStorage,
 } from "@/lib/image-generation/storage";
 import type { ImageGenerationAssets } from "@/lib/image-generation/types";
 import type { CanvasPreset, ContentType, Project } from "@/lib/projects/types";
@@ -202,6 +202,7 @@ const labels = {
   waiting: "\ub300\uae30",
   exporting: "\ub0b4\ubcf4\ub0b4\ub294 \uc911",
   missingApiKey: "\uc790\uc0b0 > API Key\uc5d0\uc11c Gemini API Key\ub97c \uba3c\uc800 \uc800\uc7a5\ud574\uc8fc\uc138\uc694.",
+  missingImageModel: "자산 > API에서 Gemini 이미지 모델을 먼저 저장해주세요.",
   generationSaving: "\ucef7 \uc218\uc815 \ub0b4\uc6a9\uc744 \uc800\uc7a5\ud55c \ub4a4 \uc774\ubbf8\uc9c0\ub97c \uc0dd\uc131\ud558\ub294 \uc911...",
   generationDone: "\uc774\ubbf8\uc9c0 \uc0dd\uc131\uc774 \uc644\ub8cc\ub418\uc5c8\uc2b5\ub2c8\ub2e4.",
   generationFailed: "\uc774\ubbf8\uc9c0 \uc0dd\uc131\uc5d0 \uc2e4\ud328\ud588\uc2b5\ub2c8\ub2e4.",
@@ -998,6 +999,16 @@ export function StudioWorkbench({ initialProjectId }: StudioWorkbenchProps) {
     return apiKey;
   }
 
+  function loadGeminiModelForGeneration() {
+    const model = loadSelectedGeminiImageModelFromStorage(window.localStorage);
+
+    if (!model) {
+      throw new Error(labels.missingImageModel);
+    }
+
+    return model;
+  }
+
   async function generateImageForCut(cut: Cut, patch: UpdateCutInput = {}) {
     const project = projectsRef.current.find((item) => item.id === cut.projectId) ?? selectedProject;
 
@@ -1006,6 +1017,7 @@ export function StudioWorkbench({ initialProjectId }: StudioWorkbenchProps) {
     }
 
     const apiKey = loadGeminiApiKeyForGeneration();
+    const model = loadGeminiModelForGeneration();
 
     let savedCut: Cut | null = null;
 
@@ -1018,7 +1030,7 @@ export function StudioWorkbench({ initialProjectId }: StudioWorkbenchProps) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           apiKey,
-          model: loadGeminiImageModelFromStorage(window.localStorage),
+          model,
           project: {
             id: project.id,
             name: project.name,
@@ -1091,6 +1103,7 @@ export function StudioWorkbench({ initialProjectId }: StudioWorkbenchProps) {
 
     try {
       loadGeminiApiKeyForGeneration();
+      loadGeminiModelForGeneration();
 
       if (selectedProject.contentType !== "card-news") {
         setGenerationState("error");
@@ -2977,6 +2990,7 @@ function getClientImageGenerationErrorMessage(error: unknown) {
   const message = error.message.trim();
   const knownKoreanMessages = new Set([
     labels.missingApiKey,
+    labels.missingImageModel,
     labels.projectLoadError,
     labels.saveCutError,
     labels.apiKeyError,

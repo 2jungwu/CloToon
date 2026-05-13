@@ -3,9 +3,6 @@ import type {
   ImageGenerationAssets,
   ImageGenerationCharacter,
 } from "@/lib/image-generation/types";
-import { defaultGeminiImageModel } from "@/lib/image-generation/models";
-
-export const GEMINI_IMAGE_MODEL = defaultGeminiImageModel;
 
 export const GENERATED_IMAGE_TEXT_POLICY =
   "Render only the user-provided dialogue inside the image when it belongs in the scene; do not invent extra readable text, captions, watermarks, logos, UI, signs, labels, or subtitles.";
@@ -16,7 +13,7 @@ export function buildImageGenerationPrompt({ assets, cut, project }: BuildImageP
   const expressionNames = character.expressions.map((expression) => expression.name).filter(Boolean);
 
   return [
-    "Create the final art layer for a local Instagram comic/card-news cut.",
+    "Create the generated art layer for a local Instagram comic/card-news cut.",
     GENERATED_IMAGE_TEXT_POLICY,
     "The Korean caption is a separate HTML/CSS overlay and must not be drawn into the generated image.",
     "The Korean dialogue may be rendered inside the image as a speech bubble or natural dialogue element, using the user text exactly as provided.",
@@ -44,7 +41,7 @@ export function buildImageGenerationPrompt({ assets, cut, project }: BuildImageP
     `Dialogue to render in image if present: ${cut.dialogue || "No dialogue provided."}`,
     "",
     "Visual direction:",
-    cut.imagePrompt || "Clean editorial webtoon composition with a consistent character.",
+    cut.imagePrompt || "Clean editorial webtoon composition with a consistent character, no random text.",
     "",
     "Quality guardrails:",
     "Avoid text artifacts, distorted hands, extra limbs, low quality, blurry details.",
@@ -52,7 +49,10 @@ export function buildImageGenerationPrompt({ assets, cut, project }: BuildImageP
     "Composition requirements:",
     "- Keep the selected character visually consistent with the markdown and expression references.",
     "- Use the background prompt as the default environment unless the cut prompt clearly overrides it.",
-    "- Leave comfortable lower-frame space for the later HTML/CSS caption overlay.",
+    "- Use the caption only to understand emotion, action, and layout needs.",
+    "- Leave comfortable lower-frame space for the later editable HTML/CSS caption overlay.",
+    "- Draw the dialogue as a speech bubble or natural dialogue element only when dialogue is provided.",
+    "- If no dialogue is provided, do not draw a speech bubble.",
     "- Do not draw title cards, subtitles, labels, signs, watermarks, logos, UI, or any text not explicitly provided by the user.",
   ].join("\n");
 }

@@ -16,8 +16,8 @@ import { toCssImageUrl } from "@/lib/cuts/image-data-url";
 import type { Cut, CutImageStatus } from "@/lib/cuts/types";
 import {
   loadGeminiApiKeyFromStorage,
-  loadGeminiImageModelFromStorage,
   loadImageGenerationAssetsFromStorage,
+  loadSelectedGeminiImageModelFromStorage,
 } from "@/lib/image-generation/storage";
 import type { ImageGenerationAssets } from "@/lib/image-generation/types";
 import type { Project } from "@/lib/projects/types";
@@ -212,6 +212,16 @@ export function WorkspaceEditor({ project, initialCuts }: WorkspaceEditorProps) 
       return;
     }
 
+    const model = loadSelectedGeminiImageModelFromStorage(window.localStorage);
+
+    if (!model) {
+      setGenerationState({
+        status: "error",
+        message: "Assets > API에서 Gemini 이미지 모델을 먼저 저장해주세요.",
+      });
+      return;
+    }
+
     let savedCut: Cut | null = null;
     setGenerationState({ status: "generating", message: "컷 저장 후 이미지 생성 중..." });
 
@@ -228,7 +238,7 @@ export function WorkspaceEditor({ project, initialCuts }: WorkspaceEditorProps) 
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           apiKey,
-          model: loadGeminiImageModelFromStorage(window.localStorage),
+          model,
           project: {
             id: project.id,
             name: project.name,
