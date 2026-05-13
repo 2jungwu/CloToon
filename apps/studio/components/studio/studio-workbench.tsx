@@ -117,8 +117,6 @@ const labels = {
   status: "\uc0c1\ud0dc",
   noContent: "\ub0b4\uc6a9 \uc5c6\uc74c",
   selectedCut: "\uc120\ud0dd\ud55c \ucef7",
-  cutScenario: "\ucef7 \uc2dc\ub098\ub9ac\uc624",
-  cutScenarioPlaceholder: "\uc774 \ucef7\uc5d0\uc11c \ubcf4\uc5ec\uc904 \uc7a5\uba74\uc744 \uc801\uc5b4\uc8fc\uc138\uc694.",
   fullScenario: "\uc804\uccb4 \uc2dc\ub098\ub9ac\uc624",
   fullScenarioPlaceholder:
     "\uce74\ub4dc\ub274\uc2a4 \uc804\uccb4 \ud750\ub984\uc744 \uc801\uc5b4\uc8fc\uc138\uc694.",
@@ -126,7 +124,7 @@ const labels = {
   caption: "\uc790\ub9c9",
   captionPlaceholder: "\ud654\uba74\uc5d0 \ud45c\uc2dc\ud560 \uc790\ub9c9\uc744 \uc785\ub825\ud558\uc138\uc694.",
   applyCaptionStyleDefaults: "\uae30\ubcf8 \uc2a4\ud0c0\uc77c \uc801\uc6a9",
-  captionLayerEdit: "자막 레이어 편집",
+  captionLayerEdit: "폰트 레이어 편집",
   captionTextStyle: "텍스트와 글자 스타일",
   captionBoxStyle: "배경, 테두리, 여백, 너비",
   fontColor: "폰트 컬러",
@@ -1940,25 +1938,16 @@ function CutEditor({
 
   return (
     <div className="editor-panel production-editor">
-      <div className="panel-heading inline-heading">
+      <div className="panel-heading selected-cut-heading">
         <div>
           <h2>{selectedCut.caption || labels.selectedCut}</h2>
+          <div className="selected-cut-heading-actions">
+            <Button onClick={applyCaptionStyleDefaultsToSelectedCut} type="button" variant="secondary">
+              {labels.applyCaptionStyleDefaults}
+            </Button>
+          </div>
         </div>
-        <Button onClick={applyCaptionStyleDefaultsToSelectedCut} type="button" variant="secondary">
-          {labels.applyCaptionStyleDefaults}
-        </Button>
       </div>
-
-      <label className="field-stack">
-        {labels.cutScenario}
-        <textarea
-          onBlur={onFlushSelectedCut}
-          onChange={(event) => onUpdateSelectedCut({ scenario: event.target.value })}
-          placeholder={labels.cutScenarioPlaceholder}
-          rows={5}
-          value={selectedCut.scenario}
-        />
-      </label>
 
       <CaptionLayerEditor
         onBlur={onFlushSelectedCut}

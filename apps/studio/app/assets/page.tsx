@@ -651,6 +651,15 @@ function CaptionStylePanel({
         </div>
       </div>
 
+      <div className="caption-style-preview-wrap">
+        <div
+          className="asset-preview caption-style-default-preview"
+          style={getCaptionLayerStyle(assets.captionStyleDefaults) as CaptionLayerCSSProperties}
+        >
+          <p className="image-preview-caption">{previewCaption}</p>
+        </div>
+      </div>
+
       <CaptionLayerEditor
         onChange={(next) => onUpdate(next.captionStyle)}
         showCaptionTextarea={false}
@@ -659,13 +668,6 @@ function CaptionStylePanel({
           captionStyle: assets.captionStyleDefaults,
         }}
       />
-
-      <div
-        className="asset-preview caption-style-default-preview"
-        style={getCaptionLayerStyle(assets.captionStyleDefaults) as CaptionLayerCSSProperties}
-      >
-        <p className="image-preview-caption">{previewCaption}</p>
-      </div>
 
       <SaveRow onSave={onSave} saved={saveState === "assets"} />
     </>
