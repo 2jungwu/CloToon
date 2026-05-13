@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { captionStyleSchema, normalizeCaptionStyle } from "@/lib/caption-style/schema";
 import { createCut, duplicateCut, listCuts } from "@/lib/cuts/repository";
 import { getProject } from "@/lib/projects/repository";
 
@@ -18,6 +19,7 @@ const createCutSchema = z.object({
   dialogue: z.string().max(2000).optional(),
   imagePrompt: z.string().max(4000).optional(),
   negativePrompt: z.string().max(2000).optional(),
+  captionStyle: captionStyleSchema.optional(),
   duplicateFromCutId: z.string().uuid().optional(),
 });
 
@@ -65,6 +67,9 @@ export async function POST(request: Request, { params }: CutsRouteProps) {
     dialogue: result.data.dialogue,
     imagePrompt: result.data.imagePrompt,
     negativePrompt: result.data.negativePrompt,
+    captionStyle: result.data.captionStyle
+      ? normalizeCaptionStyle(result.data.captionStyle)
+      : undefined,
   });
 
   return NextResponse.json({ cut }, { status: 201 });

@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
+import { defaultGeminiImageModel } from "./models.ts";
 import { buildImageGenerationPrompt } from "./prompt-builder.ts";
 import type {
   ImageGenerationAssets,
@@ -42,7 +43,7 @@ const assets: ImageGenerationAssets = {
   },
 };
 
-test("buildImageGenerationPrompt combines assets and cut context while banning rendered text", () => {
+test("buildImageGenerationPrompt combines assets and cut context while keeping caption as overlay", () => {
   const prompt = buildImageGenerationPrompt({ assets, cut, project });
 
   assert.match(prompt, /clo/);
@@ -54,5 +55,11 @@ test("buildImageGenerationPrompt combines assets and cut context while banning r
   assert.match(prompt, /What is this/);
   assert.match(prompt, /1:1 square canvas/);
   assert.match(prompt, /Quality guardrails/);
-  assert.match(prompt, /No readable text, captions, speech bubbles, Korean lettering, UI text, subtitles, or dialogue/);
+  assert.match(prompt, /Caption overlay only, do not render in image/);
+  assert.match(prompt, /Dialogue to render in image if present/);
+  assert.match(prompt, /speech bubble or natural dialogue element/);
+  assert.match(prompt, /do not invent extra readable text/);
+  assert.doesNotMatch(prompt, /No readable text, captions, speech bubbles, Korean lettering, UI text, subtitles, or dialogue/);
+  assert.doesNotMatch(prompt, new RegExp(defaultGeminiImageModel));
+  assert.doesNotMatch(prompt, /data:image\/png;base64,AAAA/);
 });

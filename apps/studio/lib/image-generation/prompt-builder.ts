@@ -7,8 +7,8 @@ import { defaultGeminiImageModel } from "@/lib/image-generation/models";
 
 export const GEMINI_IMAGE_MODEL = defaultGeminiImageModel;
 
-export const GENERATED_IMAGE_TEXT_BAN =
-  "No readable text, captions, speech bubbles, Korean lettering, UI text, subtitles, or dialogue inside the generated image.";
+export const GENERATED_IMAGE_TEXT_POLICY =
+  "Render only the user-provided dialogue inside the image when it belongs in the scene; do not invent extra readable text, captions, watermarks, logos, UI, signs, labels, or subtitles.";
 
 export function buildImageGenerationPrompt({ assets, cut, project }: BuildImagePromptInput) {
   const character = getSelectedCharacter(assets);
@@ -16,9 +16,10 @@ export function buildImageGenerationPrompt({ assets, cut, project }: BuildImageP
   const expressionNames = character.expressions.map((expression) => expression.name).filter(Boolean);
 
   return [
-    "Create the image layer for a local Instagram comic/card-news cut.",
-    GENERATED_IMAGE_TEXT_BAN,
-    "The final Korean caption and dialogue will be rendered later as HTML/CSS overlays, so the image must remain clean.",
+    "Create the final art layer for a local Instagram comic/card-news cut.",
+    GENERATED_IMAGE_TEXT_POLICY,
+    "The Korean caption is a separate HTML/CSS overlay and must not be drawn into the generated image.",
+    "The Korean dialogue may be rendered inside the image as a speech bubble or natural dialogue element, using the user text exactly as provided.",
     "",
     `Project: ${project.name}`,
     `Content type: ${project.contentType}`,
@@ -39,11 +40,11 @@ export function buildImageGenerationPrompt({ assets, cut, project }: BuildImageP
     "",
     "Cut context:",
     `Scenario: ${cut.scenario || "No scenario provided."}`,
-    `Caption context only, do not render as text: ${cut.caption || "No caption provided."}`,
-    `Dialogue context only, do not render as text: ${cut.dialogue || "No dialogue provided."}`,
+    `Caption overlay only, do not render in image: ${cut.caption || "No caption provided."}`,
+    `Dialogue to render in image if present: ${cut.dialogue || "No dialogue provided."}`,
     "",
     "Visual direction:",
-    cut.imagePrompt || "Clean editorial webtoon composition, consistent character, no text.",
+    cut.imagePrompt || "Clean editorial webtoon composition with a consistent character.",
     "",
     "Quality guardrails:",
     "Avoid text artifacts, distorted hands, extra limbs, low quality, blurry details.",
@@ -51,8 +52,8 @@ export function buildImageGenerationPrompt({ assets, cut, project }: BuildImageP
     "Composition requirements:",
     "- Keep the selected character visually consistent with the markdown and expression references.",
     "- Use the background prompt as the default environment unless the cut prompt clearly overrides it.",
-    "- Leave comfortable empty areas for later caption/dialogue overlays.",
-    "- Do not draw speech bubbles, title cards, subtitles, labels, signs, watermarks, logos, or UI.",
+    "- Leave comfortable lower-frame space for the later HTML/CSS caption overlay.",
+    "- Do not draw title cards, subtitles, labels, signs, watermarks, logos, UI, or any text not explicitly provided by the user.",
   ].join("\n");
 }
 
