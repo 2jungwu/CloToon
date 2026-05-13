@@ -1,40 +1,103 @@
-# Image Generation Rules
+# 이미지 생성 프롬프트 규칙
 
-This app generates only the visual image layer for each cut. Final Korean caption and dialogue text must stay in the existing HTML/CSS cut preview layer.
+이 문서는 CloToon에서 Gemini 이미지 생성 요청을 만들 때 지켜야 할 기준입니다. 목표는 사용자의 캐릭터와 배경 설정을 반영한 컷 이미지를 만들고, 편집이 필요한 자막은 HTML/CSS 레이어로 유지하는 것입니다.
 
-## Inputs
+## 핵심 원칙
 
-- Project: content type and canvas preset.
-- Assets: selected character name, character markdown, character expression images, and default background prompt.
-- Cut: cut scenario, caption, dialogue, image prompt, and negative prompt.
+- 사용자가 Assets/API에서 선택한 Gemini 이미지 모델만 사용합니다. 모델명 선택 지시는 프롬프트에 넣지 않습니다.
+- API Key는 브라우저 `localStorage`에서 읽어 요청 중에만 사용하며 코드, DB, 문서, 로그, git에 저장하지 않습니다.
+- 생성 이미지는 배경, 캐릭터, 장면, 사용자가 입력한 대사를 포함할 수 있는 아트 결과입니다.
+- 자막은 생성 이미지에 굽지 않고 HTML/CSS 레이어로 렌더링합니다. 사용자는 컷별 자막 텍스트와 스타일을 다시 편집할 수 있어야 합니다.
+- 모델은 사용자가 입력한 대사만 이미지 안 말풍선 또는 자연스러운 대사 요소로 반영할 수 있습니다.
+- 모델이 임의의 추가 문장, 워터마크, 로고, UI, 간판, 라벨, 제목, 부제, 설명 텍스트를 만들지 않게 합니다.
 
-## Prompt Rules
+## 입력 데이터
 
-- Use `gemini-3.1-flash-image-preview` as the default Gemini image model.
-- Request an image response from Gemini and pass the project canvas preset through the REST-compatible `generationConfig.imageConfig.aspectRatio` field.
-- Use the selected character markdown as the primary consistency reference.
-- Use character expression images only as visual references for expression and identity.
-- Use the default background prompt unless the cut image prompt clearly overrides it.
-- Treat caption and dialogue as scene context only.
-- Do not render readable text inside generated images.
+이미지 생성 route는 다음 데이터를 조합합니다.
 
-Required ban in every prompt:
+- 프로젝트: 이름, 콘텐츠 유형, 캔버스 비율
+- 컷: 순서, 컷 시나리오, 자막, 대사, 이미지 프롬프트, 자막 레이어 스타일
+- 에셋: 선택 캐릭터, 캐릭터 설명 Markdown, 캐릭터 표정 이미지 이름, 기본 배경 이름, 배경 프롬프트, 배경 색상, 새 컷용 기본 자막 스타일
+- 설정: Gemini API Key, 사용자가 선택한 Gemini 이미지 모델
+
+`caption`은 최종 자막 오버레이의 내용입니다. 이미지 생성 모델에는 장면 톤을 이해하기 위한 맥락으로만 전달하고, 이미지 안에 그리라고 지시하지 않습니다.
+
+`dialogue`는 캐릭터가 말하는 내용입니다. 이미지 생성 모델은 이 문장을 말풍선 또는 컷 안의 대사 표현으로 반영할 수 있습니다. 단, 사용자가 입력하지 않은 텍스트를 추가하면 안 됩니다.
+
+## 프롬프트 조합 순서
+
+1. 생성 목적: 로컬 인스타툰/카드뉴스 컷의 최종 아트 레이어를 만든다.
+2. 텍스트 정책: 사용자가 입력한 대사만 이미지 안에 반영할 수 있고, 임의 텍스트는 만들지 않는다.
+3. 프로젝트 맥락: 콘텐츠 유형, 캔버스 비율, 컷 순서
+4. 캐릭터 참조: 이름, Markdown 설명, 표정 이미지 이름
+5. 배경 참조: 배경 이름, 배경 프롬프트, 기본 색상
+6. 컷 맥락: 컷 시나리오, 자막은 오버레이 전용, 대사는 이미지 안 반영 가능
+7. 시각 지시: 사용자가 작성한 이미지 프롬프트
+8. 품질 가드레일: 손/사지 왜곡, 저품질, 흐림, 임의 텍스트 방지
+9. 합성 요구사항: 하단 자막 오버레이를 위한 여백 확보
+
+## 권장 이미지 프롬프트 구조
+
+사용자의 `이미지 프롬프트`는 아래 요소를 짧은 문단 또는 줄 단위로 적는 것이 좋습니다.
 
 ```text
-No readable text, captions, speech bubbles, Korean lettering, UI text, subtitles, or dialogue inside the generated image.
+이미지 사이즈: 1080px x 1080px
+출연 캐릭터: 키푸
+연출: 창업 경진 대회 무대에서 열심히 발표하는 키푸와 그런 키푸를 무시하는 대중들.
+배경: 흰색
+구도: 정면에 키푸, 뒤에는 흐릿한 대중. 캐릭터 표정이 잘 보이는 중간 샷.
+스타일: 깔끔한 인스타툰, 선명한 외곽선, 부드러운 채색.
 ```
 
-## Storage And Privacy
+대사는 별도 `대사` 입력란에 작성합니다. 예를 들어 `꺼져!`처럼 짧고 명확할수록 이미지 모델이 말풍선으로 반영하기 쉽습니다.
 
-- Gemini API keys are not committed to source control and are not stored in the SQLite project database.
-- The browser reads the key from `local-studio-settings.geminiApiKey` and sends it only to the local Next API route for the current request.
-- Character expression images are sent only as bounded PNG/JPEG/WebP data URL references for the active generation request.
-- Runtime prompt assembly does not create intermediate markdown files.
-- Generated images are saved back to the selected cut as `imageDataUrl` with `imageStatus: "generated"`.
+자막은 별도 `자막` 입력란에 작성합니다. 자막은 HTML/CSS 레이어로 렌더링되므로 이미지 프롬프트 안에 다시 쓰지 않는 것이 좋습니다.
 
-## Failure Handling
+## 캐릭터 일관성 규칙
 
-- Missing API key should be handled in the workspace UI before calling Gemini.
-- Quota errors should tell the user to check Google AI Studio billing/quota.
-- API key errors should tell the user to verify the key.
-- Existing mock image and upload flows remain available as local fallbacks.
+- 캐릭터 설명 Markdown에는 외형, 체형, 색상, 성격, 자주 쓰는 표정, 금지 표현을 구체적으로 적습니다.
+- 캐릭터 표정 이미지는 생성될 이미지를 그대로 복사하는 용도가 아니라, 얼굴 비율과 표정 톤을 맞추기 위한 참조입니다.
+- 컷 이미지 프롬프트가 캐릭터 설명과 충돌하면 캐릭터 설명을 우선하고, 컷 프롬프트는 장면, 행동, 구도 지시로 해석합니다.
+
+## 배경 규칙
+
+- Assets의 배경은 기본 환경입니다.
+- 컷 이미지 프롬프트가 배경을 명시하면 컷 지시를 우선합니다.
+- 예를 들어 Assets 배경에 “별도 배경을 그리지 말고 흰색 배경”이라고 되어 있고, 컷 프롬프트에도 다른 배경 지시가 없다면 흰색 배경을 유지합니다.
+- 배경 색상은 fallback 기준입니다. 특정 색상만 강제하는 지시가 아니라 기본 톤으로 해석합니다.
+
+## 자막과 대사 처리
+
+- 자막: 최종 컷에 반드시 보이지만, 생성 이미지 안에 굽지 않습니다. HTML/CSS 레이어로 렌더링하고 컷별 스타일을 저장합니다.
+- 대사: 이미지 모델이 말풍선 또는 대사 표현으로 생성할 수 있습니다. 사용자가 입력한 문구를 최대한 그대로 반영합니다.
+- 대사 글자 품질은 이미지 모델의 한계가 있으므로 v1에서는 모델 결과를 기준으로 사용합니다.
+- 자막의 글자 색상, 크기, 굵게/기울임/밑줄, 정렬, 박스 배경, 테두리, 선 두께, 모서리, 안쪽여백 X/Y, 너비 모드는 웹 UI의 자막 레이어 편집으로 조정합니다.
+- Assets의 `자막 스타일` 기본값은 새 컷의 `captionStyle` 초기값으로만 사용하고, 이미지 생성 payload에서는 장면/레이아웃 맥락으로만 취급합니다.
+- 미리보기와 PNG/ZIP export는 같은 HTML/CSS 자막 레이어 스타일을 사용합니다.
+
+## 품질 체크리스트
+
+- 선택한 캐릭터가 Markdown과 표정 이미지의 핵심 특징을 유지하는가?
+- 컷 시나리오와 이미지 프롬프트의 상황이 화면에 드러나는가?
+- 사용자가 입력한 대사 외의 텍스트가 생기지 않았는가?
+- 자막 영역을 위한 하단 여백이 확보되었는가?
+- 상단 컬러 그라데이션, UI 장식, 불필요한 프레임이 이미지에 들어가지 않았는가?
+- 결과가 흐리거나 손/사지가 크게 왜곡되지 않았는가?
+
+## 실패 시 개선 순서
+
+1. 대사가 잘못 나오면 대사 입력을 짧고 명확하게 줄입니다.
+2. 캐릭터가 흔들리면 캐릭터 Markdown의 외형 규칙을 더 구체화합니다.
+3. 배경이 어긋나면 Assets 배경과 컷 이미지 프롬프트 중 어느 지시가 우선인지 명확히 적습니다.
+4. 자막 영역이 부족하면 이미지 프롬프트에 “하단에 자막 박스가 들어갈 깨끗한 여백을 남긴다”를 추가합니다.
+5. 임의 텍스트가 생기면 “사용자가 입력한 대사 외에는 어떤 글자도 만들지 않는다”를 유지합니다.
+
+## 참고 기준
+
+- Google AI Developers, Gemini API 이미지 생성 문서: https://ai.google.dev/gemini-api/docs/image-generation
+- Google AI Developers, Imagen 프롬프트 가이드: https://ai.google.dev/gemini-api/docs/imagen#imagen-prompt-guide
+- Google The Keyword, Gemini 이미지 생성 프롬프트 팁: https://blog.google/products-and-platforms/products/gemini/image-generation-prompting-tips/
+- OpenAI Academy, 이미지 생성 프롬프트 작성 가이드: https://openai.com/academy/image-generation/
+- Midjourney 공식 Prompt Basics: https://docs.midjourney.com/hc/en-us/articles/32023408776205-Prompt-Basics
+- Midjourney 공식 Image Prompts: https://docs.midjourney.com/hc/en-us/articles/32040250122381-Image-Prompts
+- Adobe Firefly 이미지 프롬프트 예시와 템플릿: https://www.adobe.com/products/firefly/ai-generated-examples/image-prompts.html

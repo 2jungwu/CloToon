@@ -1,6 +1,10 @@
 import type { ImageGenerationAssets, ImageGenerationCharacter } from "@/lib/image-generation/types";
 import { isAllowedReferenceImageDataUrl } from "@/lib/cuts/image-data-url";
-import { normalizeGeminiImageModel } from "@/lib/image-generation/models";
+import {
+  isGeminiImageModel,
+  normalizeGeminiImageModel,
+  type GeminiImageModel,
+} from "@/lib/image-generation/models";
 
 export const assetsStorageKey = "local-studio-assets";
 export const settingsStorageKey = "local-studio-settings";
@@ -18,7 +22,17 @@ export function loadGeminiApiKeyFromStorage(storage: Storage) {
 
 export function loadGeminiImageModelFromStorage(storage: Storage) {
   const value = readStorageJson(storage, settingsStorageKey);
-  return isRecord(value) ? normalizeGeminiImageModel(value.geminiModel) : normalizeGeminiImageModel(null);
+  return isRecord(value)
+    ? normalizeGeminiImageModel(readSettingsImageModel(value))
+    : normalizeGeminiImageModel(null);
+}
+
+export function loadSelectedGeminiImageModelFromStorage(
+  storage: Storage,
+): GeminiImageModel | null {
+  const value = readStorageJson(storage, settingsStorageKey);
+  const imageModel = isRecord(value) ? readSettingsImageModel(value) : null;
+  return isGeminiImageModel(imageModel) ? imageModel : null;
 }
 
 export function loadImageGenerationAssetsFromStorage(storage: Storage): ImageGenerationAssets {
@@ -145,6 +159,10 @@ function normalizeExpressions(value: unknown) {
 
 function getRecord(value: unknown) {
   return isRecord(value) ? value : null;
+}
+
+function readSettingsImageModel(value: Record<string, unknown>) {
+  return value.geminiImageModel ?? value.geminiModel;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

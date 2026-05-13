@@ -8,6 +8,8 @@ apps/*/dist/
 apps/desktop/resources/
 coverage/
 artifacts/
+output/
+.superpowers/
 .worktrees/
 *.tsbuildinfo
 .env

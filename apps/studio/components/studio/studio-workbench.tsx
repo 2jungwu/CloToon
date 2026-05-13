@@ -1,9 +1,20 @@
 "use client";
 
-import type { CSSProperties, FormEvent, KeyboardEvent, ReactNode, RefObject } from "react";
+import type {
+  FormEvent,
+  KeyboardEvent,
+  ReactNode,
+  RefObject,
+} from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { HugeiconsIcon } from "@hugeicons/react";
 import { toPng } from "html-to-image";
 import JSZip from "jszip";
+import {
+  CaptionLayerEditor,
+  getCaptionLayerStyle,
+  type CaptionLayerCSSProperties,
+} from "@/components/studio/caption-layer-editor";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -14,11 +25,13 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toCssImageUrl } from "@/lib/cuts/image-data-url";
+import { loadCaptionStyleDefaultsFromStorage } from "@/lib/caption-style/storage";
+import { defaultCaptionStyle } from "@/lib/caption-style/types";
 import type { Cut, CutTemplate, UpdateCutInput } from "@/lib/cuts/types";
 import {
   loadGeminiApiKeyFromStorage,
-  loadGeminiImageModelFromStorage,
   loadImageGenerationAssetsFromStorage,
+  loadSelectedGeminiImageModelFromStorage,
 } from "@/lib/image-generation/storage";
 import type { ImageGenerationAssets } from "@/lib/image-generation/types";
 import type { CanvasPreset, ContentType, Project } from "@/lib/projects/types";
@@ -104,14 +117,39 @@ const labels = {
   status: "\uc0c1\ud0dc",
   noContent: "\ub0b4\uc6a9 \uc5c6\uc74c",
   selectedCut: "\uc120\ud0dd\ud55c \ucef7",
-  cutScenario: "\ucef7 \uc2dc\ub098\ub9ac\uc624",
-  cutScenarioPlaceholder: "\uc774 \ucef7\uc5d0\uc11c \ubcf4\uc5ec\uc904 \uc7a5\uba74\uc744 \uc801\uc5b4\uc8fc\uc138\uc694.",
   fullScenario: "\uc804\uccb4 \uc2dc\ub098\ub9ac\uc624",
   fullScenarioPlaceholder:
     "\uce74\ub4dc\ub274\uc2a4 \uc804\uccb4 \ud750\ub984\uc744 \uc801\uc5b4\uc8fc\uc138\uc694.",
   produceAll: "\ud55c \ubc88\uc5d0 \uc81c\uc791",
   caption: "\uc790\ub9c9",
+  captionSettings: "\uc790\ub9c9 \uc124\uc815",
   captionPlaceholder: "\ud654\uba74\uc5d0 \ud45c\uc2dc\ud560 \uc790\ub9c9\uc744 \uc785\ub825\ud558\uc138\uc694.",
+  applyCaptionStyleDefaults: "\uae30\ubcf8 \uc2a4\ud0c0\uc77c \uc801\uc6a9",
+  captionLayerEdit: "폰트 레이어 편집",
+  captionTextStyle: "텍스트와 글자 스타일",
+  captionBoxStyle: "배경, 테두리, 여백, 너비",
+  fontColor: "폰트 컬러",
+  fontSize: "폰트 크기",
+  bold: "볼드",
+  italic: "이탤릭",
+  underline: "밑줄",
+  alignLeft: "좌측 정렬",
+  alignCenter: "중앙 정렬",
+  boxBackgroundColor: "배경",
+  boxBorderColor: "테두리",
+  borderWidth: "선",
+  borderRadius: "모서리",
+  boxPadding: "안쪽 여백",
+  boxWidthMode: "박스 너비 방식",
+  boxWidthFull: "전체 폭",
+  boxWidthFixed: "고정 크기",
+  boxWidthFit: "내용 맞춤",
+  boxWidthPx: "고정 너비",
+  hexColor: "16진수",
+  red: "R",
+  green: "G",
+  blue: "B",
+  confirm: "확인",
   dialogue: "\ub300\uc0ac",
   dialoguePlaceholder: "\ub300\uc0ac \ub610\ub294 \ubcf8\ubb38\uc744 \uc785\ub825\ud558\uc138\uc694.",
   imagePrompt: "\uc774\ubbf8\uc9c0 \ud504\ub86c\ud504\ud2b8",
@@ -146,12 +184,13 @@ const labels = {
   saved: "\uc800\uc7a5\ub428",
   saveError: "\uc800\uc7a5 \uc624\ub958",
   saveCutError: "\ucef7\uc744 \uc800\uc7a5\ud558\uc9c0 \ubabb\ud588\uc2b5\ub2c8\ub2e4.",
-  shell: "\uc258",
+  shell: "자막 박스",
   generating: "\uc0dd\uc131 \uc911",
   done: "\uc644\ub8cc",
   waiting: "\ub300\uae30",
   exporting: "\ub0b4\ubcf4\ub0b4\ub294 \uc911",
   missingApiKey: "\uc790\uc0b0 > API Key\uc5d0\uc11c Gemini API Key\ub97c \uba3c\uc800 \uc800\uc7a5\ud574\uc8fc\uc138\uc694.",
+  missingImageModel: "자산 > API에서 Gemini 이미지 모델을 먼저 저장해주세요.",
   generationSaving: "\ucef7 \uc218\uc815 \ub0b4\uc6a9\uc744 \uc800\uc7a5\ud55c \ub4a4 \uc774\ubbf8\uc9c0\ub97c \uc0dd\uc131\ud558\ub294 \uc911...",
   generationDone: "\uc774\ubbf8\uc9c0 \uc0dd\uc131\uc774 \uc644\ub8cc\ub418\uc5c8\uc2b5\ub2c8\ub2e4.",
   generationFailed: "\uc774\ubbf8\uc9c0 \uc0dd\uc131\uc5d0 \uc2e4\ud328\ud588\uc2b5\ub2c8\ub2e4.",
@@ -202,6 +241,14 @@ const cutTemplatesByContentType: Record<ContentType, CutTemplate> = {
   comic: "comic",
   "card-news": "card-news",
 };
+
+function getCaptionStyleDefaults() {
+  if (typeof window === "undefined") {
+    return defaultCaptionStyle;
+  }
+
+  return loadCaptionStyleDefaultsFromStorage(window.localStorage);
+}
 
 export function StudioWorkbench({ initialProjectId }: StudioWorkbenchProps) {
   const [projects, setProjects] = useState<Project[]>([]);
@@ -800,6 +847,7 @@ export function StudioWorkbench({ initialProjectId }: StudioWorkbenchProps) {
           template: cutTemplatesByContentType[project.contentType],
           scenario: "",
           caption: "",
+          captionStyle: getCaptionStyleDefaults(),
           dialogue: "",
           imagePrompt: "",
         }),
@@ -932,6 +980,16 @@ export function StudioWorkbench({ initialProjectId }: StudioWorkbenchProps) {
     return apiKey;
   }
 
+  function loadGeminiModelForGeneration() {
+    const model = loadSelectedGeminiImageModelFromStorage(window.localStorage);
+
+    if (!model) {
+      throw new Error(labels.missingImageModel);
+    }
+
+    return model;
+  }
+
   async function generateImageForCut(cut: Cut, patch: UpdateCutInput = {}) {
     const project = projectsRef.current.find((item) => item.id === cut.projectId) ?? selectedProject;
 
@@ -940,6 +998,7 @@ export function StudioWorkbench({ initialProjectId }: StudioWorkbenchProps) {
     }
 
     const apiKey = loadGeminiApiKeyForGeneration();
+    const model = loadGeminiModelForGeneration();
 
     let savedCut: Cut | null = null;
 
@@ -952,7 +1011,7 @@ export function StudioWorkbench({ initialProjectId }: StudioWorkbenchProps) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           apiKey,
-          model: loadGeminiImageModelFromStorage(window.localStorage),
+          model,
           project: {
             id: project.id,
             name: project.name,
@@ -1025,6 +1084,7 @@ export function StudioWorkbench({ initialProjectId }: StudioWorkbenchProps) {
 
     try {
       loadGeminiApiKeyForGeneration();
+      loadGeminiModelForGeneration();
 
       if (selectedProject.contentType !== "card-news") {
         setGenerationState("error");
@@ -1871,35 +1931,40 @@ function CutEditor({
     );
   }
 
+  function applyCaptionStyleDefaultsToSelectedCut() {
+    onUpdateSelectedCut({
+      captionStyle: getCaptionStyleDefaults(),
+    });
+  }
+
   return (
     <div className="editor-panel production-editor">
-      <div className="panel-heading inline-heading">
+      <div className="panel-heading selected-cut-heading">
         <div>
           <h2>{selectedCut.caption || labels.selectedCut}</h2>
+          <div className="selected-cut-heading-actions">
+            <Button onClick={applyCaptionStyleDefaultsToSelectedCut} type="button" variant="secondary">
+              {labels.applyCaptionStyleDefaults}
+            </Button>
+          </div>
         </div>
       </div>
 
-      <label className="field-stack">
-        {labels.cutScenario}
-        <textarea
-          onBlur={onFlushSelectedCut}
-          onChange={(event) => onUpdateSelectedCut({ scenario: event.target.value })}
-          placeholder={labels.cutScenarioPlaceholder}
-          rows={5}
-          value={selectedCut.scenario}
-        />
-      </label>
-
-      <label className="field-stack">
-        {labels.caption}
-        <textarea
-          onBlur={onFlushSelectedCut}
-          onChange={(event) => onUpdateSelectedCut({ caption: event.target.value })}
-          placeholder={labels.captionPlaceholder}
-          rows={3}
-          value={selectedCut.caption}
-        />
-      </label>
+      <CaptionLayerEditor
+        captionAriaLabel={labels.captionSettings}
+        captionHeadingLabel={labels.captionSettings}
+        onBlur={onFlushSelectedCut}
+        onChange={(next) =>
+          onUpdateSelectedCut({
+            caption: next.caption,
+            captionStyle: next.captionStyle,
+          })
+        }
+        value={{
+          caption: selectedCut.caption,
+          captionStyle: selectedCut.captionStyle,
+        }}
+      />
 
       <label className="field-stack">
         {labels.dialogue}
@@ -1958,6 +2023,7 @@ function ImagePreviewPanel({
   const cssImageUrl = toCssImageUrl(cut?.imageDataUrl ?? "");
   const hasImage =
     cssImageUrl !== "none" && (cut?.imageStatus === "generated" || cut?.imageStatus === "uploaded");
+  const captionStyleVars = cut ? getCaptionLayerStyle(cut.captionStyle) : {};
 
   return (
     <aside className="image-preview-panel" aria-label={labels.imageOnlyPreview}>
@@ -1972,10 +2038,11 @@ function ImagePreviewPanel({
         className={`image-preview-canvas ${getCanvasRatioClass(canvasPreset)}`}
         data-has-image={hasImage}
         role="img"
-        style={{ "--preview-image": cssImageUrl } as CSSProperties}
+        style={{ "--preview-image": cssImageUrl, ...captionStyleVars } as CaptionLayerCSSProperties}
       >
         {hasImage ? <div className="image-preview-art" /> : null}
         {!hasImage ? <div className="image-preview-placeholder" aria-hidden="true" /> : null}
+        {cut?.caption ? <p className="image-preview-caption">{cut.caption}</p> : null}
       </div>
 
       <div className="toolbar-row export-actions">
@@ -2020,17 +2087,18 @@ function CutExportCanvas({
   const templateClass = cut.template === "card-news" ? "card-news" : "comic";
   const cssImageUrl = toCssImageUrl(cut.imageDataUrl);
   const hasImage = cssImageUrl !== "none";
+  const captionStyleVars = getCaptionLayerStyle(cut.captionStyle);
 
   return (
     <article
-      className={`cut-canvas ${getCanvasRatioClass(project.canvasPreset)} ${templateClass}`}
+      className={`cut-canvas caption-layer-canvas ${getCanvasRatioClass(project.canvasPreset)} ${templateClass}`}
       data-export-cut-id={exportId}
       style={
         {
           "--cut-image": cssImageUrl,
           "--cut-caption-font": fonts.subtitle,
-          "--cut-dialogue-font": fonts.dialogue,
-        } as CSSProperties
+          ...captionStyleVars,
+        } as CaptionLayerCSSProperties
       }
     >
       <div className={hasImage ? "cut-art-layer has-image" : "cut-art-layer"}>
@@ -2040,17 +2108,7 @@ function CutExportCanvas({
           </div>
         ) : null}
       </div>
-      {cut.template === "card-news" ? (
-        <div className="card-copy">
-          {cut.caption ? <strong>{cut.caption}</strong> : null}
-          {cut.dialogue ? <p>{cut.dialogue}</p> : null}
-        </div>
-      ) : (
-        <>
-          {cut.dialogue ? <p className="speech-bubble">{cut.dialogue}</p> : null}
-          {cut.caption ? <p className="comic-caption">{cut.caption}</p> : null}
-        </>
-      )}
+      {cut.caption ? <p className="cut-caption-layer">{cut.caption}</p> : null}
     </article>
   );
 }
@@ -2251,6 +2309,7 @@ function getClientImageGenerationErrorMessage(error: unknown) {
   const message = error.message.trim();
   const knownKoreanMessages = new Set([
     labels.missingApiKey,
+    labels.missingImageModel,
     labels.projectLoadError,
     labels.saveCutError,
     labels.apiKeyError,
@@ -2286,7 +2345,6 @@ function getStatusMessageClass(saveState: SaveState, generationStatus: Generatio
 function applyExportFontVariables(root: HTMLElement | null, fonts: StudioFonts) {
   root?.querySelectorAll<HTMLElement>(".cut-canvas").forEach((node) => {
     node.style.setProperty("--cut-caption-font", fonts.subtitle);
-    node.style.setProperty("--cut-dialogue-font", fonts.dialogue);
   });
 }
 

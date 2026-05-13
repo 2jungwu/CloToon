@@ -50,6 +50,7 @@ function migrate(db: Database.Database) {
 
   addColumnIfMissing(db, "cuts", "image_data_url", "TEXT NOT NULL DEFAULT ''");
   addColumnIfMissing(db, "cuts", "image_status", "TEXT NOT NULL DEFAULT 'empty'");
+  addColumnIfMissing(db, "cuts", "caption_style_json", "TEXT NOT NULL DEFAULT ''");
 }
 
 function addColumnIfMissing(

@@ -1,3 +1,5 @@
+import type { CaptionStyle } from "@/lib/caption-style/types";
+
 export type CutTemplate = "comic" | "card-news";
 export type CutImageStatus = "empty" | "mock" | "uploaded" | "generated" | "failed";
 
@@ -13,6 +15,7 @@ export type Cut = {
   negativePrompt: string;
   imageDataUrl: string;
   imageStatus: CutImageStatus;
+  captionStyle: CaptionStyle;
   createdAt: string;
   updatedAt: string;
 };
@@ -27,6 +30,7 @@ export type CreateCutInput = {
   negativePrompt?: string;
   imageDataUrl?: string;
   imageStatus?: CutImageStatus;
+  captionStyle?: CaptionStyle;
 };
 
 export type UpdateCutInput = Partial<
@@ -40,5 +44,6 @@ export type UpdateCutInput = Partial<
     | "negativePrompt"
     | "imageDataUrl"
     | "imageStatus"
+    | "captionStyle"
   >
 >;

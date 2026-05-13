@@ -1,5 +1,16 @@
 # Studio Workbench Implementation Plan
 
+## 문서 상태
+
+이 문서는 2026-05-09에 작성된 과거 구현 계획이다. 현재 제품 기준은 `PRD.md`, `ROADMAP.md`, `DESIGN.md`를 따른다. 이 계획은 당시 작업 흐름과 폐기된 판단을 추적하기 위한 기록으로 보존한다.
+
+2026-05-13 기준 방향 전환 사유:
+
+- 당시 계획은 `image-only preview`로 생성 이미지 확인을 단순화하려 했지만, 이후 자막 레이어 편집이 핵심 제작 기능으로 확정되면서 미리보기에도 HTML/CSS 자막 레이어를 표시하도록 바뀌었다.
+- 자막과 대사를 모두 Gemini payload context로만 사용하는 방향은 폐기되었다. 현재 기준은 자막은 HTML/CSS 레이어로 최종 렌더링하고, 대사는 사용자가 입력한 문구에 한해 생성 이미지 안 말풍선/대사 표현으로 반영한다.
+- Mock 이미지, 이미지 업로드, 컷 복제/순서 변경을 숨기는 방향은 폐기되었다. Gemini quota, key, provider 실패와 무관하게 로컬 제작을 계속하려면 fallback과 컷 관리 액션이 필요하다.
+- 고급 자막 편집을 전부 후속 버전으로 미루는 방향은 일부 폐기되었다. 현재 v1은 글자 색상, 크기, 굵게/기울임/밑줄, 정렬, 박스 배경/테두리/선/모서리/안쪽여백/너비 컨트롤을 포함한다.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** `Projects`와 `Workspace`를 카드형 UI가 아닌 분할형 Studio Workbench로 통합하고, 사이드 레일, 프로젝트 drawer, 생성 modal, 단일 chip 규격을 실제 앱에 적용한다.
@@ -12,8 +23,9 @@
 
 ## 현재 상태
 
-- 구현 브랜치: `codex/studio-workbench`
-- 최신 설계 스펙: `docs/superpowers/specs/2026-05-09-studio-workbench-design.md`
+- 당시 구현 브랜치: `codex/studio-workbench`
+- 당시 설계 스펙: `docs/superpowers/specs/2026-05-09-studio-workbench-design.md`
+- 현재 기준: 이 계획은 최신 구현 지시가 아니며, 자막 레이어 편집과 HTML/CSS 자막 미리보기 방향으로 대체되었다.
 - 기존 Workbench 컴포넌트: `apps/studio/components/studio/studio-workbench.tsx`
 - 기존 route 연결:
   - `apps/studio/app/projects/page.tsx`
@@ -806,9 +818,10 @@
 
 수용 기준:
 
-- 대사와 자막은 미리보기 화면에 보이지 않는다.
-- 자막과 대사는 Gemini payload context로만 사용된다.
-- 이미지 미리보기는 회색 placeholder 또는 생성 이미지 중심이다.
+- 당시 수용 기준이었던 "대사와 자막은 미리보기 화면에 보이지 않는다"는 폐기되었다.
+- 현재 기준에서 자막은 미리보기와 export에 HTML/CSS 레이어로 표시된다.
+- 현재 기준에서 대사는 HTML 오버레이로 표시하지 않고, 사용자가 입력한 문구에 한해 생성 이미지 안 말풍선/대사 표현으로 반영할 수 있다.
+- 이미지 미리보기는 회색 placeholder, 생성/업로드 이미지, 자막 레이어를 함께 다룬다.
 - export 기능은 기존 HTML/CSS 텍스트 레이어 호환을 유지한다.
 
 ---
@@ -918,7 +931,8 @@
   - 카드뉴스에서 전체 시나리오와 `한 번에 제작` 표시
   - 인스타툰에서 전체 시나리오 영역 미노출
   - `이미지 생성` 버튼이 이미지 프롬프트 아래에 있음
-  - preview에 자막/대사 텍스트 없음
+  - preview에 HTML/CSS 자막 레이어 표시
+  - 대사 HTML 오버레이 없음
 
 - [ ] **Step 8: 브라우저에서 `/assets`를 검증한다.**
 

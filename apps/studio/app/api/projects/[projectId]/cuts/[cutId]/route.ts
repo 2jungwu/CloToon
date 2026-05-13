@@ -1,8 +1,10 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { captionStyleSchema, normalizeCaptionStyle } from "@/lib/caption-style/schema";
 import { deleteCut, updateCut } from "@/lib/cuts/repository";
 import { isAllowedCutImageDataUrl, maxCutImageDataUrlLength } from "@/lib/cuts/image-data-url";
 import { rejectInvalidDesktopMutation } from "@/lib/security/desktop-request-guard";
+import type { UpdateCutInput } from "@/lib/cuts/types";
 
 export const runtime = "nodejs";
 
@@ -26,6 +28,7 @@ const updateCutSchema = z.object({
     .refine(isAllowedCutImageDataUrl, "imageDataUrl must be an allowed image data URL.")
     .optional(),
   imageStatus: z.enum(["empty", "mock", "uploaded", "generated", "failed"]).optional(),
+  captionStyle: captionStyleSchema.optional(),
 });
 
 export async function PATCH(request: Request, { params }: CutRouteProps) {
@@ -46,7 +49,14 @@ export async function PATCH(request: Request, { params }: CutRouteProps) {
     );
   }
 
-  const cut = updateCut(projectId, cutId, result.data);
+  const { captionStyle, ...cutData } = result.data;
+  const update: UpdateCutInput = { ...cutData };
+
+  if (captionStyle) {
+    update.captionStyle = normalizeCaptionStyle(captionStyle);
+  }
+
+  const cut = updateCut(projectId, cutId, update);
 
   if (!cut) {
     return NextResponse.json({ error: "Cut not found" }, { status: 404 });

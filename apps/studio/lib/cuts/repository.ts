@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { parseCaptionStyle, serializeCaptionStyle } from "@/lib/caption-style/schema";
 import { getDatabase } from "@/lib/db/database";
 import { getProject, touchProject } from "@/lib/projects/repository";
 import type { CreateCutInput, Cut, UpdateCutInput } from "@/lib/cuts/types";
@@ -15,6 +16,7 @@ type CutRow = {
   negative_prompt: string;
   image_data_url: string;
   image_status: Cut["imageStatus"];
+  caption_style_json: string;
   created_at: string;
   updated_at: string;
 };
@@ -23,7 +25,8 @@ export function listCuts(projectId: string): Cut[] {
   const rows = getDatabase()
     .prepare(
       `SELECT id, project_id, position, template, scenario, caption, dialogue,
-              image_prompt, negative_prompt, image_data_url, image_status, created_at, updated_at
+              image_prompt, negative_prompt, image_data_url, image_status, caption_style_json,
+              created_at, updated_at
        FROM cuts
        WHERE project_id = ?
        ORDER BY position ASC, created_at ASC`,
@@ -37,7 +40,8 @@ export function getCut(projectId: string, cutId: string): Cut | null {
   const row = getDatabase()
     .prepare(
       `SELECT id, project_id, position, template, scenario, caption, dialogue,
-              image_prompt, negative_prompt, image_data_url, image_status, created_at, updated_at
+              image_prompt, negative_prompt, image_data_url, image_status, caption_style_json,
+              created_at, updated_at
        FROM cuts
        WHERE project_id = ? AND id = ?`,
     )
@@ -65,6 +69,7 @@ export function createCut(input: CreateCutInput): Cut {
     negativePrompt: input.negativePrompt ?? "",
     imageDataUrl: input.imageDataUrl ?? "",
     imageStatus: input.imageStatus ?? "empty",
+    captionStyle: parseCaptionStyle(serializeCaptionStyle(input.captionStyle)),
     createdAt: now,
     updatedAt: now,
   };
@@ -73,8 +78,9 @@ export function createCut(input: CreateCutInput): Cut {
     .prepare(
       `INSERT INTO cuts (
         id, project_id, position, template, scenario, caption, dialogue,
-        image_prompt, negative_prompt, image_data_url, image_status, created_at, updated_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        image_prompt, negative_prompt, image_data_url, image_status, caption_style_json,
+        created_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .run(
       cut.id,
@@ -88,6 +94,7 @@ export function createCut(input: CreateCutInput): Cut {
       cut.negativePrompt,
       cut.imageDataUrl,
       cut.imageStatus,
+      serializeCaptionStyle(cut.captionStyle),
       cut.createdAt,
       cut.updatedAt,
     );
@@ -121,6 +128,7 @@ export function updateCut(projectId: string, cutId: string, input: UpdateCutInpu
            negative_prompt = ?,
            image_data_url = ?,
            image_status = ?,
+           caption_style_json = ?,
            updated_at = ?
        WHERE project_id = ? AND id = ?`,
     )
@@ -133,6 +141,7 @@ export function updateCut(projectId: string, cutId: string, input: UpdateCutInpu
       next.negativePrompt,
       next.imageDataUrl,
       next.imageStatus,
+      serializeCaptionStyle(next.captionStyle),
       next.updatedAt,
       projectId,
       cutId,
@@ -160,6 +169,7 @@ export function duplicateCut(projectId: string, cutId: string): Cut | null {
     negativePrompt: source.negativePrompt,
     imageDataUrl: source.imageDataUrl,
     imageStatus: source.imageStatus,
+    captionStyle: source.captionStyle,
   });
 }
 
@@ -232,6 +242,7 @@ function toCut(row: CutRow): Cut {
     negativePrompt: row.negative_prompt,
     imageDataUrl: row.image_data_url,
     imageStatus: row.image_status,
+    captionStyle: parseCaptionStyle(row.caption_style_json),
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };

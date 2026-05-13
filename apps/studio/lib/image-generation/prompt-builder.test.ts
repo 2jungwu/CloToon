@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { buildImageGenerationPrompt } from "./prompt-builder.ts";
+import { buildImageGenerationPrompt, GENERATED_IMAGE_TEXT_POLICY } from "./prompt-builder.ts";
 import type {
   ImageGenerationAssets,
   ImageGenerationCut,
@@ -42,9 +42,10 @@ const assets: ImageGenerationAssets = {
   },
 };
 
-test("buildImageGenerationPrompt combines assets and cut context while banning rendered text", () => {
+test("buildImageGenerationPrompt creates an art-layer prompt while keeping caption as overlay", () => {
   const prompt = buildImageGenerationPrompt({ assets, cut, project });
 
+  assert.match(prompt, /generated art layer/);
   assert.match(prompt, /clo/);
   assert.match(prompt, /round silhouette/);
   assert.match(prompt, /sunny studio/);
@@ -54,5 +55,50 @@ test("buildImageGenerationPrompt combines assets and cut context while banning r
   assert.match(prompt, /What is this/);
   assert.match(prompt, /1:1 square canvas/);
   assert.match(prompt, /Quality guardrails/);
-  assert.match(prompt, /No readable text, captions, speech bubbles, Korean lettering, UI text, subtitles, or dialogue/);
+  assert.match(prompt, /Caption overlay only, do not render in image/);
+  assert.match(prompt, /Dialogue to render in image if present/);
+  assert.match(prompt, /speech bubble or natural dialogue element/);
+  assert.match(prompt, new RegExp(GENERATED_IMAGE_TEXT_POLICY));
+  assert.doesNotMatch(prompt, /No readable text, captions, speech bubbles, Korean lettering, UI text, subtitles, or dialogue/);
+  assert.doesNotMatch(prompt, /gemini-/i);
+  assert.doesNotMatch(prompt, /data:image\/png;base64,AAAA/);
+});
+
+test("buildImageGenerationPrompt keeps reference image data URLs out of the prompt text", () => {
+  const prompt = buildImageGenerationPrompt({ assets, cut, project });
+
+  assert.match(prompt, /Expression reference images provided: smile\.png/);
+  assert.doesNotMatch(prompt, /data:image/i);
+  assert.doesNotMatch(prompt, /AAAA/);
+});
+
+test("buildImageGenerationPrompt omits speech bubbles when dialogue is empty", () => {
+  const prompt = buildImageGenerationPrompt({
+    assets,
+    cut: { ...cut, dialogue: "" },
+    project,
+  });
+
+  assert.match(prompt, /Dialogue to render in image if present: No dialogue provided/);
+  assert.match(prompt, /If no dialogue is provided, do not draw a speech bubble/);
+});
+
+test("buildImageGenerationPrompt describes supported canvas presets", () => {
+  assert.match(buildImageGenerationPrompt({ assets, cut, project }), /1:1 square canvas/);
+  assert.match(
+    buildImageGenerationPrompt({
+      assets,
+      cut,
+      project: { ...project, canvasPreset: "4:5" },
+    }),
+    /4:5 vertical feed canvas/,
+  );
+  assert.match(
+    buildImageGenerationPrompt({
+      assets,
+      cut,
+      project: { ...project, canvasPreset: "9:16" },
+    }),
+    /9:16 story\/reels canvas/,
+  );
 });
